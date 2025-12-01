@@ -1,8 +1,8 @@
 package com.jipjung.project.controller;
 
 import com.jipjung.project.config.exception.ApiResponse;
-import com.jipjung.project.controller.request.LoginRequest;
-import com.jipjung.project.controller.request.SignupRequest;
+import com.jipjung.project.controller.dto.request.LoginRequest;
+import com.jipjung.project.controller.dto.request.SignupRequest;
 import com.jipjung.project.controller.response.LoginResponse;
 import com.jipjung.project.controller.response.SignupResponse;
 import com.jipjung.project.service.AuthService;

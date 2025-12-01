@@ -1,63 +1,170 @@
--- USE jipjung; -- MySQL에서만 필요
+-- ============================================================================
+-- JipJung Database Schema v2
+-- ============================================================================
+-- Description: SSAFY_HOME 기반 데이터베이스 스키마
+-- Version: 2.0
+-- Created: 2025-11-28
+-- ============================================================================
 
--- User 테이블
-CREATE TABLE IF NOT EXISTS `user` (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    nickname VARCHAR(50) NOT NULL,
-    password VARCHAR(255) NOT NULL,
-    role VARCHAR(20) DEFAULT 'USER',
+-- ============================================================================
+-- 1. Database Setup
+-- ============================================================================
+
+-- Character Set 설정
+SET NAMES utf8mb4;
+SET CHARACTER_SET_CLIENT = utf8mb4;
+SET CHARACTER_SET_CONNECTION = utf8mb4;
+SET CHARACTER_SET_RESULTS = utf8mb4;
+
+USE jipjung;
+SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0;
+SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0;
+SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';
+
+-- ============================================================================
+-- 2. Drop Tables (in reverse dependency order)
+-- ============================================================================
+
+DROP TABLE IF EXISTS favorite_apartment;
+DROP TABLE IF EXISTS apartment_deal;
+DROP TABLE IF EXISTS apartment;
+DROP TABLE IF EXISTS user;
+DROP TABLE IF EXISTS dongcode;
+
+-- ============================================================================
+-- 3. Create Tables
+-- ============================================================================
+
+-- ----------------------------------------------------------------------------
+-- 3.1 dongcode - 법정동코드 테이블
+-- ----------------------------------------------------------------------------
+CREATE TABLE dongcode (
+    dong_code VARCHAR(10) PRIMARY KEY COMMENT '법정동코드',
+    sido_name VARCHAR(30) NOT NULL COMMENT '시도명',
+    gugun_name VARCHAR(30) NOT NULL COMMENT '구군명',
+    dong_name VARCHAR(30) COMMENT '동명',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
 
--- 인덱스 생성
-CREATE INDEX idx_user_email ON `user`(email);
+    INDEX idx_sido_gugun (sido_name, gugun_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='법정동코드 테이블';
 
--- 아파트 실거래가 테이블
-CREATE TABLE IF NOT EXISTS apartment_transaction (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    apartment_name VARCHAR(100) NOT NULL COMMENT '아파트명',
-    legal_dong VARCHAR(100) NOT NULL COMMENT '법정동',
-    road_address VARCHAR(255) COMMENT '도로명 주소',
+-- ----------------------------------------------------------------------------
+-- 3.2 apartment - 아파트 기본정보 테이블
+-- ----------------------------------------------------------------------------
+CREATE TABLE apartment (
+    apt_seq VARCHAR(20) PRIMARY KEY COMMENT '아파트코드 (SSAFY 원본)',
+    dong_code VARCHAR(10) COMMENT '법정동코드',
+    sgg_cd VARCHAR(5) COMMENT '시군구코드',
+    umd_cd VARCHAR(5) COMMENT '읍면동코드',
+    umd_nm VARCHAR(20) COMMENT '읍면동명',
+    jibun VARCHAR(10) COMMENT '지번',
+    road_nm_sgg_cd VARCHAR(5) COMMENT '도로명시군구코드',
+    road_nm VARCHAR(20) COMMENT '도로명',
+    road_nm_bonbun VARCHAR(10) COMMENT '도로명번호(본번)',
+    road_nm_bubun VARCHAR(10) COMMENT '도로명번호(부번)',
+    apt_nm VARCHAR(40) NOT NULL COMMENT '아파트명',
     build_year INT COMMENT '건축년도',
-    deal_amount BIGINT NOT NULL COMMENT '거래금액(만원)',
-    deal_date DATE NOT NULL COMMENT '거래일',
-    exclusive_area DECIMAL(10, 2) NOT NULL COMMENT '전용면적(m²)',
-    floor INT COMMENT '층',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- 관심 아파트 테이블
-CREATE TABLE IF NOT EXISTS favorite_apartment (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT NOT NULL,
-    apartment_transaction_id BIGINT NOT NULL,
+    latitude DECIMAL(16, 13) COMMENT '위도',
+    longitude DECIMAL(16, 13) COMMENT '경도',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES `user`(id) ON DELETE CASCADE,
-    FOREIGN KEY (apartment_transaction_id) REFERENCES apartment_transaction(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_favorite (user_id, apartment_transaction_id)
-);
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
--- 인덱스 생성
-CREATE INDEX idx_apartment_legal_dong ON apartment_transaction(legal_dong);
-CREATE INDEX idx_apartment_deal_date ON apartment_transaction(deal_date);
-CREATE INDEX idx_favorite_user_id ON favorite_apartment(user_id);
+    FOREIGN KEY (dong_code) REFERENCES dongcode(dong_code) ON DELETE SET NULL,
+    INDEX idx_apt_nm (apt_nm),
+    INDEX idx_dong_code (dong_code),
+    INDEX idx_location (latitude, longitude),
+    INDEX idx_build_year (build_year)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='아파트 기본정보 테이블';
 
--- 더미 데이터: 아파트 실거래가
-INSERT INTO apartment_transaction (apartment_name, legal_dong, road_address, build_year, deal_amount, deal_date, exclusive_area, floor) VALUES
-('래미안대치팰리스', '서울특별시 강남구 대치동', '서울특별시 강남구 삼성로 112', 2006, 250000, '2024-01-15', 114.50, 12),
-('아크로리버파크', '서울특별시 서초구 잠원동', '서울특별시 서초구 신반포로 194', 2020, 185000, '2024-01-20', 84.92, 8),
-('헬리오시티', '서울특별시 송파구 거여동', '서울특별시 송파구 양산로 335', 2019, 95000, '2024-02-05', 59.88, 15),
-('e편한세상광교', '경기도 수원시 영통구 하동', '경기도 수원시 영통구 광교중앙로 248', 2012, 75000, '2024-02-10', 84.00, 10),
-('디에이치자이개포', '서울특별시 강남구 개포동', '서울특별시 강남구 개포로 621', 2015, 162000, '2024-02-18', 101.87, 5),
-('더샵센트럴시티', '서울특별시 마포구 공덕동', '서울특별시 마포구 마포대로 109', 2017, 123000, '2024-03-01', 74.50, 18),
-('롯데캐슬골드파크', '서울특별시 구로구 구로동', '서울특별시 구로구 디지털로 242', 2011, 68000, '2024-03-10', 84.93, 7),
-('힐스테이트광교산', '경기도 수원시 장안구 천천동', '경기도 수원시 장안구 수성로 308', 2018, 82000, '2024-03-15', 99.87, 14),
-('자이문정', '서울특별시 송파구 문정동', '서울특별시 송파구 법원로 128', 2016, 89000, '2024-03-22', 84.95, 9),
-('푸르지오시티', '서울특별시 강서구 등촌동', '서울특별시 강서구 강서로 392', 2013, 72000, '2024-04-01', 84.00, 11),
-('래미안영등포센트레빌', '서울특별시 영등포구 영등포동', '서울특별시 영등포구 영등포로 257', 2021, 145000, '2024-04-10', 84.99, 20),
-('호반써밋플레이스', '경기도 성남시 분당구 정자동', '경기도 성남시 분당구 불정로 90', 2014, 98000, '2024-04-18', 114.90, 6),
-('e편한세상금천', '서울특별시 금천구 독산동', '서울특별시 금천구 범안로 1121', 2019, 71000, '2024-04-25', 59.95, 13),
-('위례자이', '경기도 성남시 수정구 창곡동', '경기도 성남시 수정구 위례광장로 320', 2016, 88000, '2024-05-05', 84.97, 16),
-('힐스테이트반포리버뷰', '서울특별시 서초구 반포동', '서울특별시 서초구 신반포로11길 32', 2022, 198000, '2024-05-12', 99.99, 22);
+-- ----------------------------------------------------------------------------
+-- 3.3 apartment_deal - 아파트 실거래 정보 테이블
+-- ----------------------------------------------------------------------------
+CREATE TABLE apartment_deal (
+    deal_no BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '거래번호',
+    apt_seq VARCHAR(20) NOT NULL COMMENT '아파트코드',
+    apt_dong VARCHAR(40) COMMENT '동',
+    floor VARCHAR(3) COMMENT '층',
+    deal_year INT NOT NULL COMMENT '거래년도',
+    deal_month INT NOT NULL COMMENT '거래월',
+    deal_day INT NOT NULL COMMENT '거래일',
+    deal_date DATE GENERATED ALWAYS AS (
+        STR_TO_DATE(CONCAT(deal_year, '-', LPAD(deal_month, 2, '0'), '-', LPAD(deal_day, 2, '0')), '%Y-%m-%d')
+    ) STORED COMMENT '거래일자 (생성컬럼)',
+    exclu_use_ar DECIMAL(7,2) NOT NULL COMMENT '전용면적(㎡)',
+    deal_amount VARCHAR(10) NOT NULL COMMENT '거래금액(만원)',
+    deal_amount_num BIGINT GENERATED ALWAYS AS (
+        CAST(REPLACE(deal_amount, ',', '') AS UNSIGNED)
+    ) STORED COMMENT '거래금액(숫자)',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (apt_seq) REFERENCES apartment(apt_seq) ON DELETE CASCADE,
+    INDEX idx_deal_date (deal_date),
+    INDEX idx_deal_amount (deal_amount_num),
+    INDEX idx_exclu_use_ar (exclu_use_ar)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='아파트 실거래 정보 테이블';
+
+-- ----------------------------------------------------------------------------
+-- 3.4 user - 사용자 테이블 (OAuth 지원)
+-- ----------------------------------------------------------------------------
+CREATE TABLE user (
+    user_id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '사용자 ID',
+    email VARCHAR(100) UNIQUE NOT NULL COMMENT '이메일',
+    password VARCHAR(255) COMMENT '암호화된 비밀번호 (OAuth 사용자는 NULL 가능)',
+    name VARCHAR(50) NOT NULL COMMENT '이름',
+    nickname VARCHAR(50) COMMENT '닉네임',
+    phone VARCHAR(20) COMMENT '전화번호',
+    profile_image_url VARCHAR(255) COMMENT '프로필 이미지 URL',
+
+    -- OAuth 관련 필드
+    social_provider VARCHAR(20) COMMENT '소셜 로그인 제공자 (kakao, naver, google)',
+    social_id VARCHAR(100) COMMENT '소셜 로그인 고유 ID',
+
+    -- 권한 및 상태
+    role VARCHAR(20) DEFAULT 'USER' COMMENT '권한 (USER, ADMIN)',
+    is_active BOOLEAN DEFAULT TRUE COMMENT '활성화 여부',
+
+    -- 타임스탬프
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    INDEX idx_email (email),
+    INDEX idx_social (social_provider, social_id),
+    UNIQUE KEY uk_social (social_provider, social_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='사용자 테이블';
+
+-- ----------------------------------------------------------------------------
+-- 3.5 favorite_apartment - 관심 아파트 테이블
+-- ----------------------------------------------------------------------------
+CREATE TABLE favorite_apartment (
+    favorite_id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '관심 아파트 ID',
+    user_id BIGINT NOT NULL COMMENT '사용자 ID',
+    apt_seq VARCHAR(20) NOT NULL COMMENT '아파트코드',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (apt_seq) REFERENCES apartment(apt_seq) ON DELETE CASCADE,
+    UNIQUE KEY uk_user_apt (user_id, apt_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='관심 아파트 테이블';
+
+-- ============================================================================
+-- 4. Restore Settings
+-- ============================================================================
+
+SET SQL_MODE=@OLD_SQL_MODE;
+SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
+SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;
+
+-- ============================================================================
+-- 5. Verify Tables Created
+-- ============================================================================
+
+SHOW TABLES;
+
+-- ============================================================================
+-- End of Schema DDL
+-- ============================================================================
