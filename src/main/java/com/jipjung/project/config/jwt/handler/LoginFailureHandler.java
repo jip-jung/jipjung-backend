@@ -1,7 +1,7 @@
 package com.jipjung.project.config.jwt.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jipjung.project.config.exception.ApiResponse;
+import com.jipjung.project.global.response.ApiResponse;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

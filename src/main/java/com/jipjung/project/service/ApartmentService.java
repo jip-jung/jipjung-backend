@@ -1,8 +1,8 @@
 package com.jipjung.project.service;
 
-import com.jipjung.project.config.exception.DuplicateResourceException;
-import com.jipjung.project.config.exception.ErrorCode;
-import com.jipjung.project.config.exception.ResourceNotFoundException;
+import com.jipjung.project.global.exception.DuplicateResourceException;
+import com.jipjung.project.global.exception.ErrorCode;
+import com.jipjung.project.global.exception.ResourceNotFoundException;
 import com.jipjung.project.controller.dto.request.ApartmentSearchRequest;
 import com.jipjung.project.controller.dto.request.FavoriteRequest;
 import com.jipjung.project.controller.dto.response.ApartmentDetailResponse;

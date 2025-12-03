@@ -1,7 +1,7 @@
 package com.jipjung.project.service;
 
-import com.jipjung.project.config.exception.DuplicateEmailException;
-import com.jipjung.project.config.exception.ErrorCode;
+import com.jipjung.project.global.exception.DuplicateEmailException;
+import com.jipjung.project.global.exception.ErrorCode;
 import com.jipjung.project.controller.dto.request.SignupRequest;
 import com.jipjung.project.controller.dto.response.SignupResponse;
 import com.jipjung.project.domain.User;
