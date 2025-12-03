@@ -1,14 +1,23 @@
 package com.jipjung.project.config.exception;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
+@Schema(description = "API 공통 응답 래퍼")
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ApiResponse<T>(
+        @Schema(description = "HTTP 상태 코드", example = "200")
         int code,
+
+        @Schema(description = "HTTP 상태명", example = "OK")
         String status,
+
+        @Schema(description = "응답 메시지", example = "성공")
         String message,
+
+        @Schema(description = "응답 데이터", nullable = true)
         T data
 ) {
     /**
