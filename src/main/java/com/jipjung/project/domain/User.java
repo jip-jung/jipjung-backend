@@ -45,6 +45,12 @@ public class User {
     // 금융 정보
     private Long annualIncome;
     private Long existingLoanMonthly;
+    private Long currentAssets;               // 온보딩 시 입력한 현재 자산
+
+    // DSR 상태 (Phase 2)
+    private String dsrMode;                   // "LITE" or "PRO"
+    private LocalDateTime lastDsrCalculationAt;
+    private Long cachedMaxLoanAmount;         // PRO 모드 대출 한도 캐시
 
     // 게임화 정보
     private Integer currentLevel;

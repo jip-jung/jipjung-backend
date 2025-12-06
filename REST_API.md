@@ -191,12 +191,6 @@ Content-Type: application/json
       "dsrRatio": 12.0,
       "grade": "SAFE", // SAFE, CAUTION, DANGER
       "maxLoanAmount": 400000000
-    },
-
-    // 3. 레제의 첫 반응 (대시보드 가기 전, 모달이나 화면 전환용)
-    "initialReaction": {
-      "mood": "HAPPY",
-      "script": "오~ 꽤 건실하네? 기초공사부터 튼튼히 시작해보자!"
     }
   }
 }

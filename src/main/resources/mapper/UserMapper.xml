@@ -23,6 +23,10 @@
         <result property="birthYear" column="birth_year"/>
         <result property="annualIncome" column="annual_income"/>
         <result property="existingLoanMonthly" column="existing_loan_monthly"/>
+        <result property="currentAssets" column="current_assets"/>
+        <result property="dsrMode" column="dsr_mode"/>
+        <result property="lastDsrCalculationAt" column="last_dsr_calculation_at"/>
+        <result property="cachedMaxLoanAmount" column="cached_max_loan_amount"/>
         <result property="currentLevel" column="current_level"/>
         <result property="currentExp" column="current_exp"/>
         <result property="streakCount" column="streak_count"/>
@@ -62,5 +66,29 @@
         FROM `user`
         WHERE email = #{email}
     </select>
+
+    <!-- 온보딩 정보 업데이트 (currentAssets 추가) -->
+    <update id="updateOnboarding">
+        UPDATE `user`
+        SET birth_year = #{birthYear},
+            annual_income = #{annualIncome},
+            existing_loan_monthly = #{existingLoanMonthly},
+            current_assets = #{currentAssets},
+            onboarding_completed = true,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = #{userId}
+          AND is_deleted = false
+    </update>
+
+    <!-- 프로필 정보 업데이트 -->
+    <update id="updateProfile">
+        UPDATE `user`
+        SET nickname = #{nickname},
+            annual_income = #{annualIncome},
+            existing_loan_monthly = #{existingLoanMonthly},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = #{userId}
+          AND is_deleted = false
+    </update>
 
 </mapper>

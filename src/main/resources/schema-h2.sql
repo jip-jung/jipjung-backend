@@ -26,6 +26,7 @@
 -- ============================================================================
 
 DROP TABLE IF EXISTS favorite_apartment;
+DROP TABLE IF EXISTS user_preferred_area;
 DROP TABLE IF EXISTS apartment_deal;
 DROP TABLE IF EXISTS apartment;
 DROP TABLE IF EXISTS `user`;
@@ -288,8 +289,45 @@ CREATE TABLE user_collection (
     INDEX idx_collection_user (user_id)
 ) COMMENT='완성한 집 컬렉션';
 
+-- ----------------------------------------------------------------------------
+-- 3.14 user_preferred_area - 선호 지역 테이블
+-- ----------------------------------------------------------------------------
+CREATE TABLE user_preferred_area (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    area_name VARCHAR(50) NOT NULL COMMENT '선호 지역명 (강남구, 서초구 등)',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (user_id) REFERENCES `user`(user_id) ON DELETE CASCADE,
+    INDEX idx_user_area (user_id)
+) COMMENT='선호 지역 테이블';
+
 -- ============================================================================
--- 4. Restore Settings
+-- 4. Phase 2: DSR 상태 관리
+-- ============================================================================
+
+-- User 테이블에 DSR 관련 컬럼 추가
+ALTER TABLE `user` ADD COLUMN IF NOT EXISTS dsr_mode VARCHAR(10) DEFAULT 'LITE';
+ALTER TABLE `user` ADD COLUMN IF NOT EXISTS last_dsr_calculation_at TIMESTAMP NULL;
+ALTER TABLE `user` ADD COLUMN IF NOT EXISTS cached_max_loan_amount BIGINT NULL;
+ALTER TABLE `user` ADD COLUMN IF NOT EXISTS current_assets BIGINT DEFAULT 0;
+
+-- DSR 계산 이력 테이블
+CREATE TABLE IF NOT EXISTS dsr_calculation_history (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    input_json CLOB NOT NULL,
+    result_json CLOB NOT NULL,
+    dsr_mode VARCHAR(10) NOT NULL,
+    max_loan_amount BIGINT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (user_id) REFERENCES `user`(user_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_dsr_history_user ON dsr_calculation_history(user_id, created_at DESC);
+
+-- ============================================================================
+-- 5. Restore Settings
 -- ============================================================================
 
 -- SET SQL_MODE=@OLD_SQL_MODE;
@@ -297,7 +335,7 @@ CREATE TABLE user_collection (
 -- SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;
 
 -- ============================================================================
--- 5. Verify Tables Created
+-- 6. Verify Tables Created
 -- ============================================================================
 
 -- SHOW TABLES;
@@ -305,3 +343,4 @@ CREATE TABLE user_collection (
 -- ============================================================================
 -- End of Schema DDL
 -- ============================================================================
+

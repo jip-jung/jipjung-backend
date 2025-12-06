@@ -22,7 +22,8 @@ public record DashboardResponse(
         @Schema(description = "스트릭 섹션") StreakSection streak,
         @Schema(description = "DSR 섹션") DsrSection dsr,
         @Schema(description = "자산 섹션") AssetsSection assets,
-        @Schema(description = "쇼룸 섹션") ShowroomSection showroom
+        @Schema(description = "쇼룸 섹션") ShowroomSection showroom,
+        @Schema(description = "Gap 분석 섹션") GapAnalysisSection gapAnalysis
 ) {
 
     // ==========================================================================
@@ -37,15 +38,18 @@ public record DashboardResponse(
             boolean todayParticipated,
             AssetsData assetsData,
             ThemeAsset themeAsset,
-            int totalSteps
+            int totalSteps,
+            DsrSection dsrSection,
+            GapAnalysisSection gapAnalysis
     ) {
         return new DashboardResponse(
                 ProfileSection.from(user, level),
                 GoalSection.from(dreamHome),
                 StreakSection.from(user, weeklyStreaks, todayParticipated),
-                DsrSection.from(user),
+                dsrSection,
                 AssetsSection.from(assetsData),
-                ShowroomSection.from(user, level, themeAsset, totalSteps)
+                ShowroomSection.from(user, level, themeAsset, totalSteps),
+                gapAnalysis
         );
     }
 
@@ -219,28 +223,49 @@ public record DashboardResponse(
     ) {
         private static final String NO_INCOME_LABEL = "소득 정보 없음";
         private static final String NO_INCOME_COLOR = "GRAY";
+        private static final String DANGER_LABEL = "위험";
+        private static final String DANGER_COLOR = "RED";
+        private static final String SAFE_LABEL = "매우 안전";
+        private static final String SAFE_COLOR = "GREEN";
 
+        /**
+         * 기존 메서드 (deprecated) - DashboardService 마이그레이션 완료 후 삭제 예정
+         * 
+         * @deprecated Use {@link #from(User, com.jipjung.project.dsr.DsrResult)} instead
+         */
+        @Deprecated
         public static DsrSection from(User user) {
-            // 소득 정보 없음
-            if (!user.hasIncomeInfo()) {
+            FinancialInfo financialInfo = FinancialInfo.from(user);
+            long monthlyIncome = financialInfo.monthlyIncome();
+            long existingLoan = financialInfo.existingLoanRepayment();
+
+            // 소득 없음 + 대출 있음 → 최대 위험
+            if (monthlyIncome <= 0 && existingLoan > 0) {
+                return new DsrSection(
+                        100.0,
+                        DANGER_LABEL,
+                        DANGER_COLOR,
+                        financialInfo
+                );
+            }
+
+            // 소득/대출 모두 없음 → 소득 정보 없음으로 노출
+            if (monthlyIncome <= 0 && existingLoan == 0) {
                 return new DsrSection(
                         0.0,
                         NO_INCOME_LABEL,
                         NO_INCOME_COLOR,
-                        FinancialInfo.from(user)
+                        financialInfo
                 );
             }
-
-            long monthlyIncome = user.getMonthlyIncome();
-            long existingLoan = user.getExistingLoanMonthly() != null ? user.getExistingLoanMonthly() : 0;
 
             // 기존 대출 없음 → 매우 안전
             if (existingLoan == 0) {
                 return new DsrSection(
                         0.0,
-                        "매우 안전",
-                        "GREEN",
-                        FinancialInfo.from(user)
+                        SAFE_LABEL,
+                        SAFE_COLOR,
+                        financialInfo
                 );
             }
 
@@ -255,15 +280,57 @@ public record DashboardResponse(
                     dsrPercent,
                     grade.label,
                     grade.color,
-                    FinancialInfo.from(user)
+                    financialInfo
             );
         }
 
+        /**
+         * 신규 메서드 - DsrResult 연동
+         * <p>
+         * DsrCalculator에서 계산된 등급을 그대로 사용하여 통합 등급 유지.
+         *
+         * @param user      사용자 정보
+         * @param dsrResult DSR 계산 결과
+         * @param recognizedAnnualIncome 장래소득 인정 반영된 연소득 (표시/계산 일관성용)
+         * @return DsrSection
+         */
+        public static DsrSection from(
+                User user,
+                com.jipjung.project.dsr.DsrResult dsrResult,
+                long recognizedAnnualIncome
+        ) {
+            FinancialInfo financialInfo = FinancialInfo.from(user, recognizedAnnualIncome);
+
+            // DsrResult의 등급을 화면용 라벨/색상으로 변환
+            String gradeLabel = switch (dsrResult.grade()) {
+                case "SAFE" -> "안전";
+                case "WARNING" -> "주의";
+                case "RESTRICTED" -> "위험";
+                default -> dsrResult.grade();
+            };
+            String gradeColor = switch (dsrResult.grade()) {
+                case "SAFE" -> "GREEN";
+                case "WARNING" -> "YELLOW";
+                case "RESTRICTED" -> "RED";
+                default -> "GRAY";
+            };
+
+            return new DsrSection(
+                    dsrResult.currentDsrPercent(),
+                    gradeLabel,
+                    gradeColor,
+                    financialInfo
+            );
+        }
+
+        public static DsrSection from(User user, com.jipjung.project.dsr.DsrResult dsrResult) {
+            long fallbackRecognizedIncome = user.getAnnualIncome() != null ? user.getAnnualIncome() : 0L;
+            return from(user, dsrResult, fallbackRecognizedIncome);
+        }
+
         private enum DsrGrade {
-            VERY_SAFE("매우 안전", "GREEN", 0, 20),
-            SAFE("안전", "BLUE", 20, 30),
-            MODERATE("보통", "YELLOW", 30, 40),
-            CAUTION("주의", "ORANGE", 40, 50),
+            SAFE("안전", "GREEN", 0, 30),
+            CAUTION("주의", "YELLOW", 30, 50),
             DANGER("위험", "RED", 50, 100);
 
             final String label;
@@ -296,7 +363,14 @@ public record DashboardResponse(
             @Schema(description = "가용 상환 여력 (월 소득의 40% - 기존 대출)") long availableCapacity
     ) {
         public static FinancialInfo from(User user) {
+            return from(user, 0L);
+        }
+
+        public static FinancialInfo from(User user, long recognizedAnnualIncome) {
             long monthlyIncome = user.getMonthlyIncome();
+            if (recognizedAnnualIncome > 0) {
+                monthlyIncome = recognizedAnnualIncome / 12;
+            }
             long existingLoan = user.getExistingLoanMonthly() != null ? user.getExistingLoanMonthly() : 0;
             long availableCapacity = Math.max(0, (long) (monthlyIncome * 0.4) - existingLoan);
 
@@ -375,4 +449,55 @@ public record DashboardResponse(
             return new ShowroomSection(currentStep, steps, stepTitle, stepDescription, imageUrl);
         }
     }
+
+    // ==========================================================================
+    // Nested Records: Gap Analysis Section (Phase 2)
+    // ==========================================================================
+
+    /**
+     * Gap 분석 섹션
+     * <p>
+     * 목표 금액에서 현재 자산, 저축, 대출 한도를 차감한 필요 저축액 계산.
+     */
+    @Schema(description = "Gap 분석 섹션")
+    public record GapAnalysisSection(
+            @Schema(description = "목표 설정 여부") boolean hasTarget,
+            @Schema(description = "목표 금액 (미설정 시 지역 평균)") long targetAmount,
+            @Schema(description = "현재 자산 (온보딩)") long currentAssets,
+            @Schema(description = "현재 저축") long currentSavedAmount,
+            @Schema(description = "추정 대출 한도") long virtualLoanLimit,
+            @Schema(description = "필요 저축액") long requiredSavings,
+            @Schema(description = "DSR 모드") String dsrMode
+    ) {
+        /**
+         * 목표 설정 시 Gap 분석
+         */
+        public static GapAnalysisSection from(DreamHome dreamHome, User user, long maxLoanAmount) {
+            long targetAmount = dreamHome.getTargetAmount() != null ? dreamHome.getTargetAmount() : 0L;
+            long currentAssets = user.getCurrentAssets() != null ? user.getCurrentAssets() : 0L;
+            long currentSaved = dreamHome.getCurrentSavedAmount() != null ? dreamHome.getCurrentSavedAmount() : 0L;
+            long requiredSavings = Math.max(0, targetAmount - currentAssets - currentSaved - maxLoanAmount);
+
+            return new GapAnalysisSection(
+                    true, targetAmount, currentAssets, currentSaved,
+                    maxLoanAmount, requiredSavings,
+                    user.getDsrMode() != null ? user.getDsrMode() : "LITE"
+            );
+        }
+
+        /**
+         * 목표 미설정 시 Gap 분석 (임시 목표: 선호 지역 평균 시세)
+         */
+        public static GapAnalysisSection forNoTarget(User user, long maxLoanAmount, long regionAvgPrice) {
+            long currentAssets = user.getCurrentAssets() != null ? user.getCurrentAssets() : 0L;
+            long requiredSavings = Math.max(0, regionAvgPrice - currentAssets - maxLoanAmount);
+
+            return new GapAnalysisSection(
+                    false, regionAvgPrice, currentAssets, 0L,
+                    maxLoanAmount, requiredSavings,
+                    user.getDsrMode() != null ? user.getDsrMode() : "LITE"
+            );
+        }
+    }
 }
+

@@ -26,11 +26,13 @@ SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,N
 -- ============================================================================
 
 DROP TABLE IF EXISTS savings_history;
+DROP TABLE IF EXISTS dsr_calculation_history;
 DROP TABLE IF EXISTS user_collection;
 DROP TABLE IF EXISTS streak_history;
 DROP TABLE IF EXISTS theme_asset;
 DROP TABLE IF EXISTS dream_home;
 DROP TABLE IF EXISTS favorite_apartment;
+DROP TABLE IF EXISTS user_preferred_area;
 DROP TABLE IF EXISTS apartment_deal;
 DROP TABLE IF EXISTS house_theme;
 DROP TABLE IF EXISTS growth_level;
@@ -295,6 +297,20 @@ CREATE TABLE user_collection (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 COMMENT='완성한 집 컬렉션';
 
+-- ----------------------------------------------------------------------------
+-- 3.14 user_preferred_area - 선호 지역 테이블
+-- ----------------------------------------------------------------------------
+CREATE TABLE user_preferred_area (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    area_name VARCHAR(50) NOT NULL COMMENT '선호 지역명 (강남구, 서초구 등)',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (user_id) REFERENCES `user`(user_id) ON DELETE CASCADE,
+    INDEX idx_user_area (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='선호 지역 테이블';
+
 -- ============================================================================
 -- 4. Restore Settings
 -- ============================================================================
@@ -304,7 +320,38 @@ SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;
 
 -- ============================================================================
--- 5. Verify Tables Created
+
+SET SQL_MODE=@OLD_SQL_MODE;
+SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
+SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;
+
+-- ============================================================================
+-- 5. Phase 2: DSR 상태 관리
+-- ============================================================================
+
+-- User 테이블에 DSR 관련 컬럼 추가
+ALTER TABLE `user` ADD COLUMN dsr_mode VARCHAR(10) DEFAULT 'LITE' COMMENT 'DSR 모드 (LITE/PRO)';
+ALTER TABLE `user` ADD COLUMN last_dsr_calculation_at TIMESTAMP NULL COMMENT '마지막 DSR 계산 시각';
+ALTER TABLE `user` ADD COLUMN cached_max_loan_amount BIGINT NULL COMMENT 'PRO 모드 대출 한도 캐시';
+ALTER TABLE `user` ADD COLUMN current_assets BIGINT DEFAULT 0 COMMENT '온보딩 시 입력한 현재 자산';
+
+-- DSR 계산 이력 테이블
+CREATE TABLE dsr_calculation_history (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    input_json TEXT NOT NULL COMMENT 'DsrInput JSON',
+    result_json TEXT NOT NULL COMMENT 'DsrResult JSON',
+    dsr_mode VARCHAR(10) NOT NULL COMMENT 'LITE/PRO',
+    max_loan_amount BIGINT NOT NULL COMMENT '최대 대출 가능액',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (user_id) REFERENCES `user`(user_id) ON DELETE CASCADE,
+    INDEX idx_user_created (user_id, created_at DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='DSR 계산 이력 테이블';
+
+-- ============================================================================
+-- 6. Verify Tables Created
 -- ============================================================================
 
 SHOW TABLES;
