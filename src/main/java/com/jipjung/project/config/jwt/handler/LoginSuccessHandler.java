@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jipjung.project.global.response.ApiResponse;
 import com.jipjung.project.config.jwt.JwtProvider;
 import com.jipjung.project.controller.dto.response.LoginResponse;
+import com.jipjung.project.domain.User;
 import com.jipjung.project.service.CustomUserDetails;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -17,6 +18,9 @@ import java.io.IOException;
 
 /**
  * 로그인 성공 시 JWT 토큰을 생성하고 응답하는 핸들러
+ * 
+ * - accessToken: Authorization 헤더로 전달
+ * - user 정보: body로 전달 (onboardingCompleted 포함)
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -30,8 +34,8 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
                                         Authentication authentication) throws IOException, ServletException {
 
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
-        String email = userDetails.getEmail();
-        String nickname = userDetails.getNickname();
+        User user = userDetails.getUser();
+        String email = user.getEmail();
 
         // JWT 토큰 생성
         String accessToken = jwtProvider.createAccessToken(email);
@@ -42,13 +46,20 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
         response.setHeader("Authorization", "Bearer " + accessToken);
         response.setStatus(HttpServletResponse.SC_OK);
 
-        // 응답 body
-        LoginResponse loginResponse = new LoginResponse(nickname);
+        // 응답 body - user 정보 (onboardingCompleted 포함)
+        LoginResponse.UserInfo userInfo = new LoginResponse.UserInfo(
+                user.getId(),
+                user.getEmail(),
+                user.getNickname(),
+                user.getOnboardingCompleted()
+        );
+        
+        LoginResponse loginResponse = new LoginResponse(userInfo);
         ApiResponse<LoginResponse> apiResponse = ApiResponse.successBody(loginResponse);
 
         String responseBody = objectMapper.writeValueAsString(apiResponse);
         response.getWriter().write(responseBody);
 
-        log.info("로그인 성공: {}", email);
+        log.info("로그인 성공: {}, onboardingCompleted: {}", email, user.getOnboardingCompleted());
     }
 }
