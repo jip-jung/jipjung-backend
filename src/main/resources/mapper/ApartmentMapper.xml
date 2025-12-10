@@ -192,11 +192,6 @@
         FROM apartment a
         LEFT JOIN apartment_deal d
         ON a.apt_seq = d.apt_seq
-        -- [추가] 1. 검색 조건이 있다면 ON 절에 추가 (예: 최근 3년, 30평대만 보기 등)
-        -- LEFT JOIN 성질을 유지하기 위해 WHERE가 아닌 ON에 붙임
-        <if test="request != null">
-            <include refid="dealConditions"/>
-        </if>
         WHERE a.apt_seq = #{aptSeq}
         ORDER BY d.deal_date DESC, d.deal_no DESC
 

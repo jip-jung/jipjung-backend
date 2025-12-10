@@ -23,6 +23,7 @@ public enum ErrorCode {
     USER_NOT_FOUND(404, "사용자를 찾을 수 없습니다"),
     APARTMENT_NOT_FOUND(404, "아파트를 찾을 수 없습니다"),
     FAVORITE_NOT_FOUND(404, "관심 아파트를 찾을 수 없습니다"),
+    DREAM_HOME_NOT_FOUND(404, "활성 드림홈이 없습니다"),
 
     // 409 Conflict
     DUPLICATE_EMAIL(409, "이미 존재하는 이메일입니다"),
