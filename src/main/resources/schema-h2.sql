@@ -352,14 +352,14 @@ CREATE TABLE IF NOT EXISTS ai_conversation (
     -- 영수증 정보
     amount BIGINT,
     store_name VARCHAR(100),
-    category VARCHAR(30) NOT NULL,
-    payment_date DATE NOT NULL,
+    category VARCHAR(30),
+    payment_date DATE,
     memo VARCHAR(255),
     receipt_image_url VARCHAR(500),
 
     -- AI 분석/판결 결과 (JSON 저장)
-    analysis_result_json CLOB,
-    judgment_result_json CLOB,
+    analysis_result_json JSON COMMENT 'AI 분석 결과 JSON',
+    judgment_result_json JSON COMMENT 'AI 판결 결과 JSON',
 
     -- 변명 정보
     selected_excuse_id VARCHAR(30),
