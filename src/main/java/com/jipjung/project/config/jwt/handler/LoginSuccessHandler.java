@@ -5,6 +5,7 @@ import com.jipjung.project.global.response.ApiResponse;
 import com.jipjung.project.config.jwt.JwtProvider;
 import com.jipjung.project.controller.dto.response.LoginResponse;
 import com.jipjung.project.domain.User;
+import com.jipjung.project.repository.UserPreferredAreaMapper;
 import com.jipjung.project.service.CustomUserDetails;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,6 +29,7 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
 
     private final JwtProvider jwtProvider;
     private final ObjectMapper objectMapper;
+    private final UserPreferredAreaMapper userPreferredAreaMapper;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
@@ -47,11 +49,16 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
         response.setStatus(HttpServletResponse.SC_OK);
 
         // 응답 body - user 정보 (onboardingCompleted 포함)
+        var preferredAreas = userPreferredAreaMapper.findByUserId(user.getId());
+        if (preferredAreas == null) {
+            preferredAreas = java.util.List.of();
+        }
         LoginResponse.UserInfo userInfo = new LoginResponse.UserInfo(
                 user.getId(),
                 user.getEmail(),
                 user.getNickname(),
-                user.getOnboardingCompleted()
+                user.getOnboardingCompleted(),
+                preferredAreas
         );
         
         LoginResponse loginResponse = new LoginResponse(userInfo);
