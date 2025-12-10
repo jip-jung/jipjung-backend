@@ -73,6 +73,12 @@ public interface UserMapper {
     int addExp(@Param("userId") Long userId, @Param("expToAdd") int expToAdd);
 
     /**
+     * 레벨 업데이트
+     */
+    @Update("UPDATE `user` SET current_level = #{level} WHERE user_id = #{userId}")
+    int updateLevel(@Param("userId") Long userId, @Param("level") int level);
+
+    /**
      * DSR 캐시 무효화 (목표/프로필 변경 시)
      */
     @Update("UPDATE `user` SET cached_max_loan_amount = NULL, dsr_mode = 'LITE' WHERE user_id = #{userId}")

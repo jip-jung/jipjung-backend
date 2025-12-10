@@ -14,6 +14,11 @@ import java.util.List;
 public interface SavingsHistoryMapper {
 
     /**
+     * 저축 내역 저장
+     */
+    int insert(SavingsHistory savingsHistory);
+
+    /**
      * 특정 시점 이전까지의 저축 합계 조회 (KST 기준 시점을 UTC로 변환한 값 전달)
      * - DEPOSIT: +, WITHDRAW: -
      * - 차트 윈도우 시작 잔액 계산용

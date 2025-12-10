@@ -17,6 +17,13 @@
         <result property="isDeleted" column="is_deleted"/>
     </resultMap>
 
+    <!-- 저축 내역 저장 -->
+    <insert id="insert" parameterType="com.jipjung.project.domain.SavingsHistory"
+            useGeneratedKeys="true" keyProperty="savingsId" keyColumn="savings_id">
+        INSERT INTO savings_history (dream_home_id, amount, save_type, memo)
+        VALUES (#{dreamHomeId}, #{amount}, #{saveType}, #{memo})
+    </insert>
+
     <!-- 특정 날짜 이전까지의 순 저축 합계 -->
     <select id="sumBeforeDate" resultType="java.lang.Long">
         SELECT COALESCE(SUM(

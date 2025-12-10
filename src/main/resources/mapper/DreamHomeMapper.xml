@@ -42,4 +42,43 @@
         LIMIT 1
     </select>
 
+    <!-- 드림홈 생성 -->
+    <insert id="insert" parameterType="com.jipjung.project.domain.DreamHome"
+            useGeneratedKeys="true" keyProperty="dreamHomeId" keyColumn="dream_home_id">
+        INSERT INTO dream_home (user_id, apt_seq, target_amount, target_date, monthly_goal, current_saved_amount, start_date, status)
+        VALUES (#{userId}, #{aptSeq}, #{targetAmount}, #{targetDate}, #{monthlyGoal}, #{currentSavedAmount}, #{startDate}, #{status})
+    </insert>
+
+    <!-- 드림홈 목표 업데이트 (저축액 유지) -->
+    <update id="updateDreamHome" parameterType="com.jipjung.project.domain.DreamHome">
+        UPDATE dream_home
+        SET apt_seq = #{aptSeq},
+            target_amount = #{targetAmount},
+            target_date = #{targetDate},
+            monthly_goal = #{monthlyGoal},
+            start_date = #{startDate},
+            status = 'ACTIVE',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE dream_home_id = #{dreamHomeId}
+          AND is_deleted = false
+    </update>
+
+    <!-- 드림홈 상태 업데이트 -->
+    <update id="updateStatus">
+        UPDATE dream_home
+        SET status = #{status},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE dream_home_id = #{dreamHomeId}
+          AND is_deleted = false
+    </update>
+
+    <!-- 현재 저축액 업데이트 -->
+    <update id="updateCurrentSavedAmount">
+        UPDATE dream_home
+        SET current_saved_amount = #{currentSavedAmount},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE dream_home_id = #{dreamHomeId}
+          AND is_deleted = false
+    </update>
+
 </mapper>
