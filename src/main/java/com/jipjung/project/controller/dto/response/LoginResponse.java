@@ -2,6 +2,8 @@ package com.jipjung.project.controller.dto.response;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
+import java.util.List;
+
 /**
  * 로그인 응답 DTO
  * 
@@ -26,6 +28,9 @@ public record LoginResponse(
             String nickname,
             
             @Schema(description = "온보딩 완료 여부", example = "true")
-            Boolean onboardingCompleted
+            Boolean onboardingCompleted,
+
+            @Schema(description = "선호 지역 목록 (구/군명)", example = "[\"강남구\", \"서초구\"]")
+            List<String> preferredAreas
     ) {}
 }

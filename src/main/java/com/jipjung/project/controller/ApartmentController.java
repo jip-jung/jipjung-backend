@@ -6,6 +6,7 @@ import com.jipjung.project.controller.dto.request.FavoriteRequest;
 import com.jipjung.project.controller.dto.response.ApartmentDetailResponse;
 import com.jipjung.project.controller.dto.response.ApartmentListPageResponse;
 import com.jipjung.project.controller.dto.response.FavoriteResponse;
+import com.jipjung.project.controller.dto.response.RegionCoordinatesResponse;
 import com.jipjung.project.service.ApartmentService;
 import com.jipjung.project.service.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
@@ -161,5 +162,26 @@ public class ApartmentController {
         Long userId = userDetails.getUser().getId();
         apartmentService.deleteFavorite(userId, id);
         return ApiResponse.success();
+    }
+
+    @Operation(
+            summary = "지역 좌표 조회",
+            description = "지역명으로 해당 지역의 중심 좌표를 조회합니다.\n\n" +
+                    "**좌표 계산**: 해당 지역 아파트들의 평균 위도/경도\n\n" +
+                    "**기본값**: 해당 지역에 아파트가 없으면 서울시청 좌표 반환"
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "조회 성공",
+                    content = @Content(schema = @Schema(implementation = RegionCoordinatesResponse.class))
+            )
+    })
+    @GetMapping("/regions/{regionName}/coordinates")
+    public ResponseEntity<ApiResponse<RegionCoordinatesResponse>> getRegionCoordinates(
+            @Parameter(description = "지역명 (예: 강남구, 서초구)", example = "강남구") 
+            @PathVariable String regionName) {
+        RegionCoordinatesResponse response = apartmentService.getRegionCoordinates(regionName);
+        return ApiResponse.success(response);
     }
 }

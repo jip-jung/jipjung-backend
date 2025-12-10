@@ -4,6 +4,7 @@ import com.jipjung.project.global.response.ApiResponse;
 import com.jipjung.project.controller.dto.request.LoginRequest;
 import com.jipjung.project.controller.dto.request.SignupRequest;
 import com.jipjung.project.controller.dto.response.LoginResponse;
+import com.jipjung.project.controller.dto.response.LogoutResponse;
 import com.jipjung.project.controller.dto.response.SignupResponse;
 import com.jipjung.project.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,7 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-@Tag(name = "인증", description = "회원가입, 로그인 API")
+@Tag(name = "인증", description = "회원가입, 로그인, 로그아웃 API")
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -73,5 +74,24 @@ public class AuthController {
         // CustomJsonUsernamePasswordAuthenticationFilter가 가로채서 처리합니다.
         // Swagger 문서화를 위한 더미 메서드입니다.
         throw new IllegalStateException("This method should not be called. It's intercepted by the filter.");
+    }
+
+    @Operation(
+            summary = "로그아웃",
+            description = "현재 세션을 로그아웃합니다.\n\n" +
+                    "**참고**: JWT는 Stateless이므로 프론트엔드에서 토큰 삭제를 통해 로그아웃 처리됩니다."
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "로그아웃 성공",
+                    content = @Content(schema = @Schema(implementation = LogoutResponse.class))
+            )
+    })
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<LogoutResponse>> logout() {
+        // JWT는 Stateless이므로 서버 작업 없음
+        // 프론트엔드에서 토큰 삭제 처리
+        return ApiResponse.success(new LogoutResponse("로그아웃 성공"));
     }
 }
