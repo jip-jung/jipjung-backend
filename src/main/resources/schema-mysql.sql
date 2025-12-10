@@ -354,6 +354,42 @@ COMMENT='DSR 계산 이력 테이블';
 -- 6. Verify Tables Created
 -- ============================================================================
 
+-- AI Conversation (AI Manager)
+CREATE TABLE IF NOT EXISTS ai_conversation (
+    conversation_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+
+    -- 영수증 정보
+    amount BIGINT,
+    store_name VARCHAR(100),
+    category VARCHAR(30) NOT NULL,
+    payment_date DATE NOT NULL,
+    memo VARCHAR(255),
+    receipt_image_url VARCHAR(500),
+
+    -- AI 분석/판결 결과 (JSON 저장)
+    analysis_result_json TEXT,
+    judgment_result_json TEXT,
+
+    -- 변명 정보
+    selected_excuse_id VARCHAR(30),
+    custom_excuse VARCHAR(500),
+
+    -- 판결 핵심값 (역정규화 - 조회 최적화)
+    judgment_result VARCHAR(20),
+    judgment_score INT,
+    exp_change INT DEFAULT 0,
+
+    -- 상태 관리
+    status VARCHAR(20) DEFAULT 'PENDING',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (user_id) REFERENCES `user`(user_id) ON DELETE CASCADE,
+    INDEX idx_ai_conv_user (user_id, created_at DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='AI 대화 테이블';
+
 SHOW TABLES;
 
 -- ============================================================================
