@@ -190,12 +190,8 @@
         d.deal_day,
         d.deal_amount
         FROM apartment a
-<<<<<<< HEAD
-        LEFT JOIN apartment_deal d ON a.apt_seq = d.apt_seq
-=======
         LEFT JOIN apartment_deal d
         ON a.apt_seq = d.apt_seq
->>>>>>> 056d0ce97cb30bf0f506a81930170a122e9338cd
         WHERE a.apt_seq = #{aptSeq}
         ORDER BY d.deal_date DESC, d.deal_no DESC
 
