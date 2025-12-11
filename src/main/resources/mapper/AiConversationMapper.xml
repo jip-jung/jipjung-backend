@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jipjung.project.repository.AiConversationMapper">
+
+    <!-- AI 대화 저장 -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="conversationId">
+        INSERT INTO ai_conversation (
+            user_id,
+            amount,
+            store_name,
+            category,
+            payment_date,
+            memo,
+            receipt_image_url,
+            status
+        ) VALUES (
+            #{userId},
+            #{amount},
+            #{storeName},
+            #{category},
+            #{paymentDate},
+            #{memo},
+            #{receiptImageUrl},
+            'PENDING'
+        )
+    </insert>
+
+    <!-- 분석 결과 업데이트 -->
+    <update id="updateAnalysis">
+        UPDATE ai_conversation
+        SET analysis_result_json = #{analysisResultJson},
+            status = 'ANALYZED',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE conversation_id = #{conversationId}
+    </update>
+
+    <!-- 이미지 추출 결과 업데이트 (EXTRACTING) -->
+    <update id="updateExtraction">
+        UPDATE ai_conversation
+        SET analysis_result_json = #{analysisResultJson},
+            status = 'EXTRACTING',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE conversation_id = #{conversationId}
+    </update>
+
+    <!-- 판결 결과 업데이트 -->
+    <update id="updateJudgment">
+        UPDATE ai_conversation
+        SET selected_excuse_id = #{selectedExcuseId},
+            custom_excuse = #{customExcuse},
+            judgment_result = #{judgmentResult},
+            judgment_score = #{judgmentScore},
+            exp_change = #{expChange},
+            judgment_result_json = #{judgmentResultJson},
+            status = 'JUDGED',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE conversation_id = #{conversationId}
+    </update>
+
+    <!-- 지출 정보 + 분석 결과 업데이트 (confirm용) -->
+    <update id="updateConfirm">
+        UPDATE ai_conversation
+        SET amount = #{amount},
+            store_name = #{storeName},
+            category = #{category},
+            payment_date = #{paymentDate},
+            memo = #{memo},
+            analysis_result_json = #{analysisResultJson},
+            status = 'ANALYZED',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE conversation_id = #{conversationId}
+    </update>
+
+</mapper>

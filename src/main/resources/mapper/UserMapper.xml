@@ -51,6 +51,7 @@
         FROM `user`
         WHERE email = #{email}
           AND is_deleted = false
+          AND (is_active = true OR is_active IS NULL)
     </select>
 
     <!-- 사용자 등록 -->

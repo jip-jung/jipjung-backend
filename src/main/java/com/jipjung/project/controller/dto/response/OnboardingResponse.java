@@ -3,6 +3,8 @@ package com.jipjung.project.controller.dto.response;
 import com.jipjung.project.domain.User;
 import io.swagger.v3.oas.annotations.media.Schema;
 
+import java.util.List;
+
 @Schema(description = "온보딩 정보 저장 응답")
 public record OnboardingResponse(
         @Schema(description = "사용자 정보") UserInfo user,
@@ -11,9 +13,9 @@ public record OnboardingResponse(
     /**
      * 팩토리 메서드
      */
-    public static OnboardingResponse from(User user, DsrResult dsrResult) {
+    public static OnboardingResponse from(User user, DsrResult dsrResult, List<String> preferredAreas) {
         return new OnboardingResponse(
-                UserInfo.from(user),
+                UserInfo.from(user, preferredAreas),
                 dsrResult
         );
     }
@@ -26,13 +28,15 @@ public record OnboardingResponse(
     public record UserInfo(
             @Schema(description = "사용자 ID") Long id,
             @Schema(description = "닉네임") String nickname,
-            @Schema(description = "온보딩 완료 여부") boolean onboardingCompleted
+            @Schema(description = "온보딩 완료 여부") boolean onboardingCompleted,
+            @Schema(description = "선호 지역 목록 (구/군명)") List<String> preferredAreas
     ) {
-        public static UserInfo from(User user) {
+        public static UserInfo from(User user, List<String> preferredAreas) {
             return new UserInfo(
                     user.getId(),
                     user.getNickname(),
-                    true  // 온보딩 완료 후 항상 true
+                    true,  // 온보딩 완료 후 항상 true
+                    preferredAreas
             );
         }
     }

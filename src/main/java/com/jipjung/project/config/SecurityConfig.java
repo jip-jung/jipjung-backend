@@ -7,6 +7,7 @@ import com.jipjung.project.config.jwt.filter.JwtAuthenticationFilter;
 import com.jipjung.project.config.jwt.handler.LoginFailureHandler;
 import com.jipjung.project.config.jwt.handler.LoginSuccessHandler;
 import com.jipjung.project.service.LoginService;
+import com.jipjung.project.repository.UserPreferredAreaMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -35,6 +36,7 @@ public class SecurityConfig {
     private final LoginService loginService;
     private final JwtProvider jwtProvider;
     private final ObjectMapper objectMapper;
+    private final UserPreferredAreaMapper userPreferredAreaMapper;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -106,7 +108,7 @@ public class SecurityConfig {
 
     @Bean
     public LoginSuccessHandler loginSuccessHandler() {
-        return new LoginSuccessHandler(jwtProvider, objectMapper);
+        return new LoginSuccessHandler(jwtProvider, objectMapper, userPreferredAreaMapper);
     }
 
     @Bean

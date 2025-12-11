@@ -40,10 +40,11 @@ public record DashboardResponse(
             ThemeAsset themeAsset,
             int totalSteps,
             DsrSection dsrSection,
-            GapAnalysisSection gapAnalysis
+            GapAnalysisSection gapAnalysis,
+            List<String> preferredAreas
     ) {
         return new DashboardResponse(
-                ProfileSection.from(user, level),
+                ProfileSection.from(user, level, preferredAreas),
                 GoalSection.from(dreamHome),
                 StreakSection.from(user, weeklyStreaks, todayParticipated),
                 dsrSection,
@@ -63,14 +64,15 @@ public record DashboardResponse(
             @Schema(description = "칭호 (예: 터파기 건축가)") String title,
             @Schema(description = "상태 메시지") String statusMessage,
             @Schema(description = "현재 레벨") int level,
-            @Schema(description = "레벨 진행 상황") LevelProgress levelProgress
+            @Schema(description = "레벨 진행 상황") LevelProgress levelProgress,
+            @Schema(description = "선호 지역 목록 (구/군명)") List<String> preferredAreas
     ) {
         private static final String DEFAULT_TITLE = "신입 건축가";
         private static final String DEFAULT_STATUS_MESSAGE = "목표를 향해 천천히, 꾸준히 가고 있어요";
         private static final int DEFAULT_LEVEL = 1;
         private static final int DEFAULT_REQUIRED_EXP = 100;
 
-        public static ProfileSection from(User user, GrowthLevel growthLevel) {
+        public static ProfileSection from(User user, GrowthLevel growthLevel, List<String> preferredAreas) {
             String title = growthLevel != null ? growthLevel.getTitle() : DEFAULT_TITLE;
             int currentLevel = user.getCurrentLevel() != null ? user.getCurrentLevel() : DEFAULT_LEVEL;
             int currentExp = user.getCurrentExp() != null ? user.getCurrentExp() : 0;
@@ -82,7 +84,8 @@ public record DashboardResponse(
                     title,
                     DEFAULT_STATUS_MESSAGE,
                     currentLevel,
-                    new LevelProgress(currentExp, requiredExp)
+                    new LevelProgress(currentExp, requiredExp),
+                    preferredAreas != null ? List.copyOf(preferredAreas) : List.of()
             );
         }
     }
