@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 
 import java.time.LocalDate;
 
@@ -30,6 +31,11 @@ public record DreamHomeSetRequest(
 
         @Schema(description = "월 목표 저축액 (원 단위, 선택)", example = "2500000")
         @Min(value = 0, message = "월 목표 저축액은 0 이상이어야 합니다")
-        Long monthlyGoal
+        Long monthlyGoal,
+
+        @Schema(description = "선택한 테마 ID (선택, 양수만 허용)", example = "1")
+        @Positive(message = "테마 ID는 양수여야 합니다")
+        Integer themeId
 ) {
 }
+
