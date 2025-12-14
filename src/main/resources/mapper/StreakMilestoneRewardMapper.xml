@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jipjung.project.repository.StreakMilestoneRewardMapper">
+
+    <!-- Result Map -->
+    <resultMap id="StreakMilestoneRewardResultMap" type="com.jipjung.project.domain.StreakMilestoneReward">
+        <id property="rewardId" column="reward_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="milestoneDays" column="milestone_days"/>
+        <result property="expReward" column="exp_reward"/>
+        <result property="claimedAt" column="claimed_at"/>
+        <result property="streakCountAtClaim" column="streak_count_at_claim"/>
+    </resultMap>
+
+    <!-- 마일스톤 보상 수령 여부 확인 -->
+    <select id="existsByUserAndMilestone" resultType="boolean">
+        SELECT COUNT(*) > 0
+        FROM streak_milestone_reward
+        WHERE user_id = #{userId}
+          AND milestone_days = #{milestoneDays}
+    </select>
+
+    <!-- 보상 기록 삽입 -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="rewardId">
+        INSERT INTO streak_milestone_reward (user_id, milestone_days, exp_reward, streak_count_at_claim)
+        VALUES (#{userId}, #{milestoneDays}, #{expReward}, #{streakCountAtClaim})
+    </insert>
+
+    <!-- 사용자가 수령한 모든 마일스톤 조회 -->
+    <select id="findByUserId" resultMap="StreakMilestoneRewardResultMap">
+        SELECT *
+        FROM streak_milestone_reward
+        WHERE user_id = #{userId}
+        ORDER BY milestone_days ASC
+    </select>
+
+</mapper>
