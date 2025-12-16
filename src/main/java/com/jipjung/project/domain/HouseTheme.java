@@ -24,7 +24,7 @@ public class HouseTheme {
     private static final String CDN_BASE_URL_ENV_KEY = "JIPJUNG_CDN_BASE_URL";
 
     /** 기본 SVG 경로 (폴백용) */
-    public static final String DEFAULT_IMAGE_PATH = "phase7.svg";
+    public static final String DEFAULT_IMAGE_PATH = "phase6.svg";
 
     private Integer themeId;
     private String themeCode;

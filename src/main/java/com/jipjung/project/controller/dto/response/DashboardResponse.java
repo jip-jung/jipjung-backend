@@ -431,6 +431,9 @@ public record DashboardResponse(
             @Schema(description = "총 단계 수") int totalSteps,
             @Schema(description = "단계명") String stepTitle,
             @Schema(description = "단계 설명") String stepDescription,
+            @Schema(description = "선택된 테마 ID") Integer themeId,
+            @Schema(description = "선택된 테마 코드") String themeCode,
+            @Schema(description = "선택된 테마 이름") String themeName,
             @Schema(description = "이미지 URL") String imageUrl
     ) {
         private static final String DEFAULT_STEP_TITLE = "터파기";
@@ -446,10 +449,23 @@ public record DashboardResponse(
                     ? level.getStepName() : DEFAULT_STEP_TITLE;
             String stepDescription = level != null && level.getDescription() != null
                     ? level.getDescription() : DEFAULT_STEP_DESCRIPTION;
+
+            Integer themeId = houseTheme != null ? houseTheme.getThemeId() : null;
+            String themeCode = houseTheme != null ? houseTheme.getThemeCode() : null;
+            String themeName = houseTheme != null ? houseTheme.getThemeName() : null;
             // HouseTheme.getFullImageUrl()가 CDN URL 또는 폴백 경로 반환
             String imageUrl = houseTheme != null ? houseTheme.getFullImageUrl() : "/" + HouseTheme.DEFAULT_IMAGE_PATH;
 
-            return new ShowroomSection(currentStep, steps, stepTitle, stepDescription, imageUrl);
+            return new ShowroomSection(
+                    currentStep,
+                    steps,
+                    stepTitle,
+                    stepDescription,
+                    themeId,
+                    themeCode,
+                    themeName,
+                    imageUrl
+            );
         }
     }
 
