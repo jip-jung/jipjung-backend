@@ -7,13 +7,13 @@ package com.jipjung.project.service;
  */
 final class LevelPolicy {
 
-    static final int MAX_LEVEL = 7;
+    static final int MAX_LEVEL = 6;
 
     /**
      * 레벨별 필요 경험치 임계값
      * 인덱스 = 레벨 - 1
      */
-    private static final int[] LEVEL_THRESHOLDS = {0, 100, 300, 600, 1000, 1500, 2100};
+    private static final int[] LEVEL_THRESHOLDS = {0, 100, 300, 600, 1000, 1500};
 
     private LevelPolicy() {}
 
