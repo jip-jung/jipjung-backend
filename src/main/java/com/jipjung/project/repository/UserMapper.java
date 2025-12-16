@@ -18,6 +18,13 @@ public interface UserMapper {
      */
     User findById(@Param("userId") Long userId);
 
+    /**
+     * ID로 활성 사용자 조회 + row lock (FOR UPDATE)
+     * <p>
+     * 스트릭/EXP 등 동시 갱신 구간에서 사용자 단위 직렬화를 위해 사용합니다.
+     */
+    User findByIdForUpdate(@Param("userId") Long userId);
+
     Optional<User> findByEmail(@Param("email") String email);
 
     int insertUser(User user);
@@ -97,5 +104,63 @@ public interface UserMapper {
             @Param("userId") Long userId,
             @Param("annualIncome") Long annualIncome,
             @Param("existingLoanMonthly") Long existingLoanMonthly
+    );
+
+    /**
+     * 사용자 Soft Delete (is_deleted = true, is_active = false)
+     */
+    @Update("""
+        UPDATE `user`
+        SET is_deleted = true,
+            is_active = false,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = #{userId}
+          AND is_deleted = false
+    """)
+    int softDeleteUser(@Param("userId") Long userId);
+
+    /**
+     * 사용자의 선택 테마 업데이트
+     * <p>
+     * 드림홈 설정 시 사용자가 선택한 테마 ID를 저장.
+     *
+     * @param userId  사용자 ID
+     * @param themeId 테마 ID
+     * @return 업데이트 영향 행 수
+     */
+    @Update("""
+        UPDATE `user`
+        SET selected_theme_id = #{themeId},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = #{userId}
+          AND is_deleted = false
+    """)
+    int updateSelectedTheme(@Param("userId") Long userId, @Param("themeId") Integer themeId);
+
+    /**
+     * 스트릭 정보 업데이트
+     * <p>
+     * 연속 저축 일수, 최대 기록, 마지막 참여일을 갱신합니다.
+     *
+     * @param userId         사용자 ID
+     * @param streakCount    현재 연속일수
+     * @param maxStreak      최대 연속일수
+     * @param lastStreakDate 마지막 스트릭 참여일
+     * @return 업데이트 영향 행 수
+     */
+    @Update("""
+        UPDATE `user`
+        SET streak_count = #{streakCount},
+            max_streak = #{maxStreak},
+            last_streak_date = #{lastStreakDate},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = #{userId}
+          AND is_deleted = false
+    """)
+    int updateStreak(
+            @Param("userId") Long userId,
+            @Param("streakCount") int streakCount,
+            @Param("maxStreak") int maxStreak,
+            @Param("lastStreakDate") java.time.LocalDate lastStreakDate
     );
 }

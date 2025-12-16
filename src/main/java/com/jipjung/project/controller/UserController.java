@@ -1,7 +1,9 @@
 package com.jipjung.project.controller;
 
+import com.jipjung.project.controller.dto.request.DeleteAccountRequest;
 import com.jipjung.project.controller.dto.request.OnboardingRequest;
 import com.jipjung.project.controller.dto.request.ProfileUpdateRequest;
+import com.jipjung.project.controller.dto.response.DeleteAccountResponse;
 import com.jipjung.project.controller.dto.response.OnboardingResponse;
 import com.jipjung.project.controller.dto.response.ProfileUpdateResponse;
 import com.jipjung.project.global.response.ApiResponse;
@@ -17,6 +19,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,7 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 사용자 컨트롤러
  * - 온보딩 및 프로필 관리 API
  */
-@Tag(name = "사용자", description = "온보딩 및 프로필 관리 API")
+@Tag(name = "사용자", description = "온보딩, 프로필 관리 및 계정 삭제 API")
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
@@ -119,5 +122,43 @@ public class UserController {
                 request
         );
         return ApiResponse.success(response);
+    }
+
+    @Operation(
+            summary = "회원탈퇴",
+            description = """
+                    현재 로그인된 사용자의 계정을 삭제합니다.
+                    
+                    **요구사항:**
+                    - 비밀번호 확인 필수
+                    
+                    **처리 내용:**
+                    - Soft Delete (is_deleted = true)
+                    - 로그인 불가, 데이터 보존
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "탈퇴 성공",
+                    content = @Content(schema = @Schema(implementation = DeleteAccountResponse.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400",
+                    description = "비밀번호 불일치"
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401",
+                    description = "인증 필요"
+            )
+    })
+    @DeleteMapping("/account")
+    public ResponseEntity<ApiResponse<DeleteAccountResponse>> deleteAccount(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody DeleteAccountRequest request
+    ) {
+        userService.deleteAccount(userDetails.getUsername(), request.password());
+        return ApiResponse.success(new DeleteAccountResponse("회원탈퇴가 완료되었습니다"));
     }
 }

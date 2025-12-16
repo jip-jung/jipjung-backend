@@ -181,6 +181,7 @@ CREATE TABLE house_theme (
     theme_id INT AUTO_INCREMENT PRIMARY KEY,
     theme_code VARCHAR(20) UNIQUE NOT NULL COMMENT 'MODERN, HANOK, CASTLE...',
     theme_name VARCHAR(50) NOT NULL COMMENT '테마 이름',
+    image_path VARCHAR(100) COMMENT '상대 경로 (예: themes/modern/phase.svg)',
     is_active BOOLEAN DEFAULT TRUE COMMENT '현재 선택 가능 여부',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -188,23 +189,8 @@ CREATE TABLE house_theme (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 COMMENT='하우스 테마 테이블';
 
--- ----------------------------------------------------------------------------
--- 3.8 theme_asset - 테마별 레벨 이미지 테이블
--- ----------------------------------------------------------------------------
-CREATE TABLE theme_asset (
-    asset_id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    theme_id INT NOT NULL,
-    level INT NOT NULL,
-    image_url VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    is_deleted BOOLEAN DEFAULT FALSE,
-
-    FOREIGN KEY (theme_id) REFERENCES house_theme(theme_id) ON DELETE CASCADE,
-    FOREIGN KEY (level) REFERENCES growth_level(level) ON DELETE CASCADE,
-    UNIQUE KEY uk_theme_level (theme_id, level)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-COMMENT='테마별 레벨 이미지 테이블';
+-- theme_asset 테이블 삭제됨 (단일 SVG per theme 아키텍처로 전환)
+-- 이제 house_theme.image_path 컬럼 사용
 
 -- ----------------------------------------------------------------------------
 -- 3.9 user 테이블 컬럼 추가 (게임/금융)
@@ -354,8 +340,67 @@ COMMENT='DSR 계산 이력 테이블';
 -- 6. Verify Tables Created
 -- ============================================================================
 
+-- AI Conversation (AI Manager)
+CREATE TABLE IF NOT EXISTS ai_conversation (
+    conversation_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+
+    -- 영수증 정보
+    amount BIGINT,
+    store_name VARCHAR(100),
+    category VARCHAR(30),
+    payment_date DATE,
+    memo VARCHAR(255),
+    receipt_image_url VARCHAR(500),
+
+    -- AI 분석/판결 결과 (JSON 저장)
+    analysis_result_json JSON COMMENT 'AI 분석 결과 JSON',
+    judgment_result_json JSON COMMENT 'AI 판결 결과 JSON',
+
+    -- 변명 정보
+    selected_excuse_id VARCHAR(30),
+    custom_excuse VARCHAR(500),
+
+    -- 판결 핵심값 (역정규화 - 조회 최적화)
+    judgment_result VARCHAR(20),
+    judgment_score INT,
+    exp_change INT DEFAULT 0,
+
+    -- 상태 관리
+    status VARCHAR(20) DEFAULT 'PENDING',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (user_id) REFERENCES `user`(user_id) ON DELETE CASCADE,
+    INDEX idx_ai_conv_user (user_id, created_at DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='AI 대화 테이블';
+
 SHOW TABLES;
+
+-- ============================================================================
+-- 7. Daily Activity (Phase: Activity-Based Streak)
+-- ============================================================================
+
+-- 일일 활동 기록 테이블
+CREATE TABLE daily_activity (
+    activity_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    activity_date DATE NOT NULL COMMENT '활동 날짜 (KST)',
+    activity_type VARCHAR(30) NOT NULL COMMENT 'DASHBOARD, AI_ANALYSIS, AI_JUDGMENT, SAVINGS',
+    exp_earned INT DEFAULT 0 COMMENT '획득 경험치',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    -- 복합 유니크: 같은 날 같은 활동 유형은 1회만
+    CONSTRAINT uk_user_activity_date_type 
+        UNIQUE (user_id, activity_date, activity_type),
+
+    FOREIGN KEY (user_id) REFERENCES `user`(user_id) ON DELETE CASCADE,
+    INDEX idx_daily_activity_user_date (user_id, activity_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='일일 활동 기록 테이블';
 
 -- ============================================================================
 -- End of Schema DDL
 -- ============================================================================
+

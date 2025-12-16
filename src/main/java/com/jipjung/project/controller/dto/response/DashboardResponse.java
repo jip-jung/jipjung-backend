@@ -37,18 +37,19 @@ public record DashboardResponse(
             List<StreakHistory> weeklyStreaks,
             boolean todayParticipated,
             AssetsData assetsData,
-            ThemeAsset themeAsset,
+            HouseTheme houseTheme,
             int totalSteps,
             DsrSection dsrSection,
-            GapAnalysisSection gapAnalysis
+            GapAnalysisSection gapAnalysis,
+            List<String> preferredAreas
     ) {
         return new DashboardResponse(
-                ProfileSection.from(user, level),
+                ProfileSection.from(user, level, preferredAreas),
                 GoalSection.from(dreamHome),
                 StreakSection.from(user, weeklyStreaks, todayParticipated),
                 dsrSection,
                 AssetsSection.from(assetsData),
-                ShowroomSection.from(user, level, themeAsset, totalSteps),
+                ShowroomSection.from(user, level, houseTheme, totalSteps),
                 gapAnalysis
         );
     }
@@ -63,14 +64,15 @@ public record DashboardResponse(
             @Schema(description = "칭호 (예: 터파기 건축가)") String title,
             @Schema(description = "상태 메시지") String statusMessage,
             @Schema(description = "현재 레벨") int level,
-            @Schema(description = "레벨 진행 상황") LevelProgress levelProgress
+            @Schema(description = "레벨 진행 상황") LevelProgress levelProgress,
+            @Schema(description = "선호 지역 목록 (구/군명)") List<String> preferredAreas
     ) {
         private static final String DEFAULT_TITLE = "신입 건축가";
         private static final String DEFAULT_STATUS_MESSAGE = "목표를 향해 천천히, 꾸준히 가고 있어요";
         private static final int DEFAULT_LEVEL = 1;
         private static final int DEFAULT_REQUIRED_EXP = 100;
 
-        public static ProfileSection from(User user, GrowthLevel growthLevel) {
+        public static ProfileSection from(User user, GrowthLevel growthLevel, List<String> preferredAreas) {
             String title = growthLevel != null ? growthLevel.getTitle() : DEFAULT_TITLE;
             int currentLevel = user.getCurrentLevel() != null ? user.getCurrentLevel() : DEFAULT_LEVEL;
             int currentExp = user.getCurrentExp() != null ? user.getCurrentExp() : 0;
@@ -82,7 +84,8 @@ public record DashboardResponse(
                     title,
                     DEFAULT_STATUS_MESSAGE,
                     currentLevel,
-                    new LevelProgress(currentExp, requiredExp)
+                    new LevelProgress(currentExp, requiredExp),
+                    preferredAreas != null ? List.copyOf(preferredAreas) : List.of()
             );
         }
     }
@@ -428,13 +431,16 @@ public record DashboardResponse(
             @Schema(description = "총 단계 수") int totalSteps,
             @Schema(description = "단계명") String stepTitle,
             @Schema(description = "단계 설명") String stepDescription,
+            @Schema(description = "선택된 테마 ID") Integer themeId,
+            @Schema(description = "선택된 테마 코드") String themeCode,
+            @Schema(description = "선택된 테마 이름") String themeName,
             @Schema(description = "이미지 URL") String imageUrl
     ) {
         private static final String DEFAULT_STEP_TITLE = "터파기";
         private static final String DEFAULT_STEP_DESCRIPTION = "기초 공사를 시작합니다";
         private static final int DEFAULT_TOTAL_STEPS = 7;
 
-        public static ShowroomSection from(User user, GrowthLevel level, ThemeAsset themeAsset, int totalSteps) {
+        public static ShowroomSection from(User user, GrowthLevel level, HouseTheme houseTheme, int totalSteps) {
             int steps = totalSteps > 0 ? totalSteps : DEFAULT_TOTAL_STEPS;
             int rawCurrentStep = user.getCurrentLevel() != null ? user.getCurrentLevel() : 1;
             int currentStep = Math.min(Math.max(rawCurrentStep, 1), steps);
@@ -443,10 +449,23 @@ public record DashboardResponse(
                     ? level.getStepName() : DEFAULT_STEP_TITLE;
             String stepDescription = level != null && level.getDescription() != null
                     ? level.getDescription() : DEFAULT_STEP_DESCRIPTION;
-            String imageUrl = themeAsset != null && themeAsset.getImageUrl() != null
-                    ? themeAsset.getImageUrl() : ThemeAsset.DEFAULT_IMAGE_URL;
 
-            return new ShowroomSection(currentStep, steps, stepTitle, stepDescription, imageUrl);
+            Integer themeId = houseTheme != null ? houseTheme.getThemeId() : null;
+            String themeCode = houseTheme != null ? houseTheme.getThemeCode() : null;
+            String themeName = houseTheme != null ? houseTheme.getThemeName() : null;
+            // HouseTheme.getFullImageUrl()가 CDN URL 또는 폴백 경로 반환
+            String imageUrl = houseTheme != null ? houseTheme.getFullImageUrl() : "/" + HouseTheme.DEFAULT_IMAGE_PATH;
+
+            return new ShowroomSection(
+                    currentStep,
+                    steps,
+                    stepTitle,
+                    stepDescription,
+                    themeId,
+                    themeCode,
+                    themeName,
+                    imageUrl
+            );
         }
     }
 

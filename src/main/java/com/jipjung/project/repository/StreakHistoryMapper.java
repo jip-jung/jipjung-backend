@@ -26,4 +26,12 @@ public interface StreakHistoryMapper {
      * 특정 날짜 스트릭 존재 여부 확인
      */
     boolean existsByUserIdAndDate(@Param("userId") Long userId, @Param("date") LocalDate date);
+
+    /**
+     * 스트릭 기록 삽입
+     *
+     * @param streakHistory 스트릭 기록
+     * @return 영향받은 행 수
+     */
+    int insert(StreakHistory streakHistory);
 }

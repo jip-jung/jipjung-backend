@@ -31,4 +31,11 @@
           AND streak_date = #{date}
     </select>
 
+    <!-- 스트릭 기록 삽입 -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="streakId">
+        INSERT INTO streak_history (user_id, streak_date, exp_earned)
+        VALUES (#{userId}, #{streakDate}, #{expEarned})
+    </insert>
+
 </mapper>
+

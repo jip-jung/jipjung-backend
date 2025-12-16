@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jipjung.project.repository.DailyActivityMapper">
+
+    <!-- Result Map -->
+    <resultMap id="DailyActivityResultMap" type="com.jipjung.project.domain.DailyActivity">
+        <id property="activityId" column="activity_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="activityDate" column="activity_date"/>
+        <result property="activityType" column="activity_type"/>
+        <result property="expEarned" column="exp_earned"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <!-- 특정 날짜에 해당 활동 유형으로 이미 참여했는지 확인 -->
+    <select id="existsByUserIdAndDateAndType" resultType="boolean">
+        SELECT COUNT(*) > 0
+        FROM daily_activity
+        WHERE user_id = #{userId}
+          AND activity_date = #{activityDate}
+          AND activity_type = #{activityType}
+    </select>
+
+    <!-- 특정 날짜의 활동 건수 조회 -->
+    <select id="countByUserIdAndDate" resultType="int">
+        SELECT COUNT(*)
+        FROM daily_activity
+        WHERE user_id = #{userId}
+          AND activity_date = #{activityDate}
+    </select>
+
+    <!-- 특정 날짜의 총 획득 EXP 조회 -->
+    <select id="sumExpByUserIdAndDate" resultType="int">
+        SELECT COALESCE(SUM(exp_earned), 0)
+        FROM daily_activity
+        WHERE user_id = #{userId}
+          AND activity_date = #{activityDate}
+    </select>
+
+    <!-- 일일 활동 기록 삽입 -->
+    <insert id="insert" useGeneratedKeys="true" keyProperty="activityId">
+        INSERT INTO daily_activity (user_id, activity_date, activity_type, exp_earned)
+        VALUES (#{userId}, #{activityDate}, #{activityType}, #{expEarned})
+    </insert>
+
+</mapper>

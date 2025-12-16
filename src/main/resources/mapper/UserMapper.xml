@@ -45,12 +45,22 @@
           AND is_deleted = false
     </select>
 
+    <!-- ID로 활성 사용자 조회 + row lock -->
+    <select id="findByIdForUpdate" resultMap="UserResultMap">
+        SELECT *
+        FROM `user`
+        WHERE user_id = #{userId}
+          AND is_deleted = false
+        FOR UPDATE
+    </select>
+
     <!-- 이메일로 사용자 조회 -->
     <select id="findByEmail" resultMap="UserResultMap">
         SELECT *
         FROM `user`
         WHERE email = #{email}
           AND is_deleted = false
+          AND (is_active = true OR is_active IS NULL)
     </select>
 
     <!-- 사용자 등록 -->
