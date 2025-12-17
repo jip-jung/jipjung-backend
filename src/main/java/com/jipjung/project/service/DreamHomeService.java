@@ -35,6 +35,7 @@ public class DreamHomeService {
     private final HouseThemeMapper houseThemeMapper;
     private final DsrService dsrService;
     private final StreakService streakService;
+    private final CollectionService collectionService;
 
     // 1만원당 1 EXP (10만원당 10 EXP와 동일 비율이지만, 10만원 미만 저축에도 EXP가 반영되도록 단위를 세분화)
     private static final long EXP_PER_UNIT = 10_000L;
@@ -244,6 +245,9 @@ public class DreamHomeService {
         if (isCompleted) {
             dreamHomeMapper.updateStatus(dreamHome.getDreamHomeId(), DreamHomeStatus.COMPLETED);
             log.info("Dream home completed! userId: {}, dreamHomeId: {}", userId, dreamHome.getDreamHomeId());
+
+            // 컬렉션 자동 등록 (멱등성 보장)
+            collectionService.registerOnCompletion(userId, dreamHome, newSavedAmount);
         }
         return isCompleted;
     }

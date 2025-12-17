@@ -19,6 +19,13 @@ public interface DreamHomeMapper {
     DreamHome findActiveByUserId(@Param("userId") Long userId);
 
     /**
+     * 드림홈 단건 조회
+     * - is_deleted = false
+     * - 아파트 정보 JOIN 포함
+     */
+    DreamHome findById(@Param("dreamHomeId") Long dreamHomeId);
+
+    /**
      * 드림홈 생성
      */
     int insert(DreamHome dreamHome);
