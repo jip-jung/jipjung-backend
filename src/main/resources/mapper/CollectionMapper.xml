@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.jipjung.project.repository.CollectionMapper">
+
+    <!-- 사용자의 완성된 집 목록 조회 (상세 정보 포함) -->
+    <select id="findByUserId" resultType="map">
+        SELECT 
+            uc.collection_id,
+            uc.theme_id,
+            ht.theme_name,
+            ht.theme_code,
+            uc.dream_home_id,
+            a.apt_nm AS property_name,
+            TRIM(CONCAT(d.gugun_name, ' ', COALESCE(d.dong_name, ''))) AS location,
+            dh.target_amount,
+            dh.start_date,
+            COALESCE(uc.duration_days, DATEDIFF(uc.completed_at, dh.start_date)) AS saving_period_days,
+            uc.completed_at,
+            uc.is_main_display,
+            uc.total_saved,
+            uc.house_name
+        FROM user_collection uc
+        JOIN house_theme ht ON uc.theme_id = ht.theme_id
+        LEFT JOIN dream_home dh ON uc.dream_home_id = dh.dream_home_id
+        LEFT JOIN apartment a ON dh.apt_seq = a.apt_seq
+        LEFT JOIN dongcode d ON a.dong_code = d.dong_code
+        WHERE uc.user_id = #{userId}
+        ORDER BY uc.completed_at DESC
+    </select>
+
+    <!-- 컬렉션 상세 조회 (목록 조회와 동일한 조인 결과 단건) -->
+    <select id="findDetailByUserIdAndCollectionId" resultType="map">
+        SELECT
+            uc.collection_id,
+            uc.theme_id,
+            ht.theme_name,
+            ht.theme_code,
+            uc.dream_home_id,
+            a.apt_nm AS property_name,
+            TRIM(CONCAT(d.gugun_name, ' ', COALESCE(d.dong_name, ''))) AS location,
+            dh.target_amount,
+            dh.start_date,
+            COALESCE(uc.duration_days, DATEDIFF(uc.completed_at, dh.start_date)) AS saving_period_days,
+            uc.completed_at,
+            uc.is_main_display,
+            uc.total_saved,
+            uc.house_name
+        FROM user_collection uc
+        JOIN house_theme ht ON uc.theme_id = ht.theme_id
+        LEFT JOIN dream_home dh ON uc.dream_home_id = dh.dream_home_id
+        LEFT JOIN apartment a ON dh.apt_seq = a.apt_seq
+        LEFT JOIN dongcode d ON a.dong_code = d.dong_code
+        WHERE uc.user_id = #{userId}
+          AND uc.collection_id = #{collectionId}
+        LIMIT 1
+    </select>
+
+    <!-- 컬렉션 단건 조회 -->
+    <select id="findById" resultType="com.jipjung.project.domain.UserCollection">
+        SELECT 
+            collection_id,
+            user_id,
+            theme_id,
+            dream_home_id,
+            house_name,
+            completed_at,
+            is_main_display,
+            total_saved,
+            duration_days
+        FROM user_collection
+        WHERE collection_id = #{collectionId}
+    </select>
+
+    <!-- 드림홈 ID로 컬렉션 조회 -->
+    <select id="findByDreamHomeId" resultType="com.jipjung.project.domain.UserCollection">
+        SELECT 
+            collection_id,
+            user_id,
+            theme_id,
+            dream_home_id,
+            house_name,
+            completed_at,
+            is_main_display,
+            total_saved,
+            duration_days
+        FROM user_collection
+        WHERE dream_home_id = #{dreamHomeId}
+    </select>
+
+    <!-- 컬렉션 등록 -->
+    <insert id="insert" parameterType="com.jipjung.project.domain.UserCollection" 
+            useGeneratedKeys="true" keyProperty="collectionId">
+        INSERT INTO user_collection (
+            user_id,
+            theme_id,
+            dream_home_id,
+            house_name,
+            completed_at,
+            is_main_display,
+            total_saved,
+            duration_days
+        ) VALUES (
+            #{userId},
+            #{themeId},
+            #{dreamHomeId},
+            #{houseName},
+            #{completedAt},
+            #{isMainDisplay},
+            #{totalSaved},
+            #{durationDays}
+        )
+    </insert>
+
+    <!-- 대표 컬렉션 해제 -->
+    <update id="clearMainDisplay">
+        UPDATE user_collection
+        SET is_main_display = FALSE
+        WHERE user_id = #{userId}
+          AND is_main_display = TRUE
+    </update>
+
+    <!-- 대표 컬렉션 설정 -->
+    <update id="setMainDisplay">
+        UPDATE user_collection
+        SET is_main_display = TRUE
+        WHERE collection_id = #{collectionId}
+    </update>
+
+    <!-- 활성 드림홈 존재 여부 확인 -->
+    <select id="hasActiveDreamHome" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1 FROM dream_home
+            WHERE user_id = #{userId}
+              AND status = 'ACTIVE'
+              AND is_deleted = FALSE
+        )
+    </select>
+
+    <!-- 저축 여정 상세 조회 (윈도우 함수로 누적합 계산) -->
+    <select id="findJourneyEvents" resultType="map">
+        SELECT 
+            sh.savings_id AS event_id,
+            sh.save_type AS event_type,
+            sh.created_at AS date,
+            sh.amount,
+            sh.memo,
+            SUM(
+                CASE 
+                    WHEN sh.save_type = 'DEPOSIT' THEN sh.amount 
+                    ELSE -sh.amount 
+                END
+            ) OVER (
+                PARTITION BY sh.dream_home_id 
+                ORDER BY sh.created_at
+            ) AS cumulative_total
+        FROM savings_history sh
+        WHERE sh.dream_home_id = #{dreamHomeId}
+          AND sh.is_deleted = FALSE
+        ORDER BY sh.created_at ASC
+    </select>
+
+</mapper>
