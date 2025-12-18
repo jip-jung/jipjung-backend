@@ -155,8 +155,8 @@ public class DashboardService {
         // 4. totalSteps 조회
         int totalSteps = resolveTotalSteps();
 
-        // 5. DreamHome 조회 (없으면 null)
-        DreamHome dreamHome = dreamHomeMapper.findActiveByUserId(userId);
+        // 5. DreamHome 조회 (ACTIVE 우선, 없으면 최근 COMPLETED; 없으면 null)
+        DreamHome dreamHome = dreamHomeMapper.findLatestForDashboardByUserId(userId);
 
         // 6. HouseTheme 조회 (fallback + 로깅)
         HouseTheme houseTheme = resolveHouseTheme(user.getSelectedThemeId());

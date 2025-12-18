@@ -92,6 +92,31 @@ public class CollectionController {
         return ApiResponse.success(response);
     }
 
+    @Operation(
+            summary = "진행 중인 드림홈 여정 조회",
+            description = """
+                    현재 진행 중인 드림홈의 저축 여정을 조회합니다.
+                    
+                    **특징:**
+                    - 완성된 컬렉션이 아닌 ACTIVE 상태의 드림홈 여정
+                    - 미도달 Phase는 reachedAt/cumulativeAmount/events가 비어있을 수 있음
+                    - 응답 형식은 완성된 여정과 동일
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "조회 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "인증 필요"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "진행 중인 드림홈이 없음")
+    })
+    @GetMapping("/in-progress/journey")
+    public ResponseEntity<ApiResponse<JourneyResponse>> getInProgressJourney(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        JourneyResponse response = collectionService.getInProgressJourney(userDetails.getId());
+        return ApiResponse.success(response);
+    }
+
     // =========================================================================
     // 대표 컬렉션 설정
     // =========================================================================

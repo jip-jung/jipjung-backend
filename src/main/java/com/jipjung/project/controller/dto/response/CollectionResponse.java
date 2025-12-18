@@ -19,8 +19,78 @@ public record CollectionResponse(
         int totalCount,
 
         @Schema(description = "활성 드림홈 존재 여부", example = "true")
-        boolean activeGoalExists
+        boolean activeGoalExists,
+
+        @Schema(description = "진행 중인 드림홈 정보 (없으면 null)")
+        InProgressInfo inProgress
 ) {
+
+    /**
+     * 진행 중인 드림홈 요약 정보 (컬렉션 화면 표시용)
+     */
+    @Schema(description = "진행 중인 드림홈 정보")
+    public record InProgressInfo(
+            @Schema(description = "드림홈 ID", example = "15")
+            Long dreamHomeId,
+
+            @Schema(description = "테마 코드", example = "CLASSIC")
+            String themeCode,
+
+            @Schema(description = "매물명", example = "강남 오피스텔")
+            String propertyName,
+
+            @Schema(description = "위치", example = "서울 강남구")
+            String location,
+
+            @Schema(description = "현재 단계 (1~11)", example = "4")
+            int currentPhase,
+
+            @Schema(description = "총 단계 수", example = "11")
+            int totalPhases
+    ) {
+        private static final int TOTAL_PHASES = 11;
+
+        /**
+         * Map으로부터 InProgressInfo 생성 (Mapper 결과 변환용)
+         */
+        public static InProgressInfo fromMap(Map<String, Object> map) {
+            if (map == null) return null;
+            
+            Long targetAmount = getLong(map, "target_amount");
+            Long savedAmount = getLong(map, "current_saved_amount");
+            int currentPhase = calculatePhase(savedAmount, targetAmount);
+
+            return new InProgressInfo(
+                    getLong(map, "dream_home_id"),
+                    getString(map, "theme_code"),
+                    getString(map, "property_name"),
+                    getString(map, "location"),
+                    currentPhase,
+                    TOTAL_PHASES
+            );
+        }
+
+        private static int calculatePhase(Long savedAmount, Long targetAmount) {
+            if (targetAmount == null || targetAmount <= 0) return 1;
+            long saved = savedAmount != null ? savedAmount : 0;
+            double progress = (double) saved / targetAmount;
+            int phase = (int) Math.floor(progress * TOTAL_PHASES) + 1;
+            return Math.max(1, Math.min(TOTAL_PHASES, phase));
+        }
+
+        private static Long getLong(Map<String, Object> map, String key) {
+            Object val = map.get(key);
+            if (val == null) return null;
+            if (val instanceof Long l) return l;
+            if (val instanceof Number n) return n.longValue();
+            return null;
+        }
+
+        private static String getString(Map<String, Object> map, String key) {
+            Object val = map.get(key);
+            return val != null ? val.toString() : null;
+        }
+    }
 
     /**
      * 컬렉션 아이템 정보

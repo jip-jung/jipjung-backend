@@ -19,6 +19,14 @@ public interface DreamHomeMapper {
     DreamHome findActiveByUserId(@Param("userId") Long userId);
 
     /**
+     * 대시보드용 드림홈 조회
+     * - ACTIVE가 있으면 ACTIVE를 우선, 없으면 최근 COMPLETED를 반환
+     * - is_deleted = false
+     * - 아파트 정보 JOIN 포함
+     */
+    DreamHome findLatestForDashboardByUserId(@Param("userId") Long userId);
+
+    /**
      * 드림홈 단건 조회
      * - is_deleted = false
      * - 아파트 정보 JOIN 포함

@@ -161,4 +161,25 @@
         ORDER BY sh.created_at ASC
     </select>
 
+    <!-- 진행 중인 드림홈 요약 정보 조회 (컬렉션 목록용) -->
+    <select id="findInProgressSummary" resultType="map">
+        SELECT 
+            dh.dream_home_id,
+            ht.theme_code,
+            a.apt_nm AS property_name,
+            TRIM(CONCAT(d.gugun_name, ' ', COALESCE(d.dong_name, ''))) AS location,
+            dh.target_amount,
+            dh.current_saved_amount
+        FROM dream_home dh
+        JOIN `user` u ON dh.user_id = u.user_id
+        JOIN house_theme ht ON ht.theme_id = COALESCE(u.selected_theme_id, 1)
+        LEFT JOIN apartment a ON dh.apt_seq = a.apt_seq
+        LEFT JOIN dongcode d ON a.dong_code = d.dong_code
+        WHERE dh.user_id = #{userId}
+          AND dh.status = 'ACTIVE'
+          AND dh.is_deleted = FALSE
+        ORDER BY dh.created_at DESC
+        LIMIT 1
+    </select>
+
 </mapper>

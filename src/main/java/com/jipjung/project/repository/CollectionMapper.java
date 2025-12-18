@@ -95,4 +95,15 @@ public interface CollectionMapper {
      * @return 저축 이벤트 목록 (누적합 포함)
      */
     List<Map<String, Object>> findJourneyEvents(@Param("dreamHomeId") Long dreamHomeId);
+
+    /**
+     * 진행 중인 드림홈 요약 정보 조회
+     * <p>
+     * 컬렉션 목록에서 "진행 중" 아이템 표시용
+     *
+     * @param userId 사용자 ID
+     * @return 진행 중 드림홈 정보 (없으면 null)
+     */
+    Map<String, Object> findInProgressSummary(@Param("userId") Long userId);
 }
+

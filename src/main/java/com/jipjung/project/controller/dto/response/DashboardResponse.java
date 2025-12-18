@@ -60,6 +60,7 @@ public record DashboardResponse(
 
     @Schema(description = "프로필 섹션")
     public record ProfileSection(
+            @Schema(description = "사용자 ID") Long userId,
             @Schema(description = "닉네임") String nickname,
             @Schema(description = "이메일") String email,
             @Schema(description = "생년") Integer birthYear,
@@ -96,6 +97,7 @@ public record DashboardResponse(
                     ? user.getCreatedAt().toString() : null;
 
             return new ProfileSection(
+                    user.getId(),
                     user.getNickname(),
                     user.getEmail(),
                     user.getBirthYear(),
@@ -134,6 +136,7 @@ public record DashboardResponse(
 
     @Schema(description = "목표 섹션")
     public record GoalSection(
+            @Schema(description = "드림홈 ID") Long dreamHomeId,
             @Schema(description = "목표 아파트명") String targetPropertyName,
             @Schema(description = "목표 금액") long totalAmount,
             @Schema(description = "저축 금액") long savedAmount,
@@ -145,7 +148,7 @@ public record DashboardResponse(
 
         public static GoalSection from(DreamHome dreamHome) {
             if (dreamHome == null) {
-                return new GoalSection(NO_GOAL_MESSAGE, 0, 0, 0, 0.0, false);
+                return new GoalSection(null, NO_GOAL_MESSAGE, 0, 0, 0, 0.0, false);
             }
 
             String aptName = dreamHome.getApartment() != null
@@ -156,6 +159,7 @@ public record DashboardResponse(
             long savedAmount = dreamHome.getCurrentSavedAmount() != null ? dreamHome.getCurrentSavedAmount() : 0;
 
             return new GoalSection(
+                    dreamHome.getDreamHomeId(),
                     aptName,
                     targetAmount,
                     savedAmount,

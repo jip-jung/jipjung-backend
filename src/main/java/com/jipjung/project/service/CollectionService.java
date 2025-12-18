@@ -85,13 +85,88 @@ public class CollectionService {
     @Transactional(readOnly = true)
     public CollectionResponse getCollections(Long userId) {
         List<Map<String, Object>> rawCollections = collectionMapper.findByUserId(userId);
-        boolean hasActiveGoal = collectionMapper.hasActiveDreamHome(userId);
+        Map<String, Object> inProgressData = collectionMapper.findInProgressSummary(userId);
+        boolean hasActiveGoal = inProgressData != null || collectionMapper.hasActiveDreamHome(userId);
 
         List<CollectionItem> collections = rawCollections.stream()
                 .map(CollectionItem::fromMap)
                 .toList();
 
-        return new CollectionResponse(collections, collections.size(), hasActiveGoal);
+        // 진행 중인 드림홈 정보 조회 (additive change)
+        CollectionResponse.InProgressInfo inProgress = CollectionResponse.InProgressInfo.fromMap(inProgressData);
+
+        return new CollectionResponse(collections, collections.size(), hasActiveGoal, inProgress);
+    }
+
+    // =========================================================================
+    // 진행 중 드림홈 여정 조회
+    // =========================================================================
+
+    /**
+     * 진행 중인 드림홈의 저축 여정 조회
+     * <p>
+     * 현재 ACTIVE 상태의 드림홈을 기준으로 여정 데이터를 조회합니다.
+     * 완성된 컬렉션 여정과 동일한 응답 형식을 사용합니다.
+     *
+     * @param userId 사용자 ID
+     * @return 저축 여정 응답 (완성된 여정과 동일한 형식)
+     * @throws BusinessException 진행 중인 드림홈이 없는 경우
+     */
+    @Transactional(readOnly = true)
+    public JourneyResponse getInProgressJourney(Long userId) {
+        Map<String, Object> inProgressData = collectionMapper.findInProgressSummary(userId);
+        if (inProgressData == null) {
+            throw new BusinessException(ErrorCode.DREAM_HOME_NOT_FOUND,
+                    "진행 중인 드림홈이 없습니다.");
+        }
+
+        Long dreamHomeId = getLong(inProgressData, "dream_home_id");
+        if (dreamHomeId == null) {
+            throw new BusinessException(ErrorCode.DREAM_HOME_NOT_FOUND);
+        }
+
+        // 저축 이벤트 조회
+        List<Map<String, Object>> events = collectionMapper.findJourneyEvents(dreamHomeId);
+
+        Long targetAmount = getLong(inProgressData, "target_amount");
+        String themeCode = Objects.requireNonNullElse(getString(inProgressData, "theme_code"), "CLASSIC");
+        String propertyName = getString(inProgressData, "property_name");
+        String location = getString(inProgressData, "location");
+
+        // 시작일 추정 (첫 저축 이벤트 기준)
+        LocalDate startDate = events.isEmpty() ? LocalDate.now() 
+                : getLocalDate(events.get(0), "date");
+        if (startDate == null) startDate = LocalDate.now();
+
+        CollectionInfo collectionInfo = new CollectionInfo(
+                null, // 진행 중이므로 collectionId 없음
+                null, // themeName은 optional
+                themeCode,
+                propertyName,
+                location
+        );
+
+        // 진행 중이므로 완료일은 null, 현재까지 소요 기간
+        int totalDays = Math.max(0, (int) ChronoUnit.DAYS.between(startDate, LocalDate.now()));
+        long totalDeposits = events.stream()
+                .filter(e -> EVENT_DEPOSIT.equals(getString(e, "event_type")))
+                .count();
+
+        JourneySummary summary = new JourneySummary(
+                startDate,
+                null, // 아직 완료되지 않음
+                totalDays,
+                (int) totalDeposits,
+                targetAmount
+        );
+
+        List<PhaseInfo> phases = buildPhasesFromEvents(
+                events,
+                Math.max(1L, targetAmount != null ? targetAmount : 1L),
+                themeCode
+        );
+
+        return new JourneyResponse(collectionInfo, summary, phases);
     }
 
     // =========================================================================
