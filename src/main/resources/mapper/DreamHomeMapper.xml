@@ -42,6 +42,31 @@
         LIMIT 1
     </select>
 
+    <!-- 대시보드용 드림홈 조회 (ACTIVE 우선, 없으면 최근 COMPLETED) -->
+    <select id="findLatestForDashboardByUserId" resultMap="DreamHomeResultMap">
+        SELECT dh.*, a.apt_nm, a.umd_nm, a.road_nm, a.build_year, a.latitude, a.longitude
+        FROM dream_home dh
+        LEFT JOIN apartment a ON dh.apt_seq = a.apt_seq
+        WHERE dh.user_id = #{userId}
+          AND dh.status IN ('ACTIVE', 'COMPLETED')
+          AND dh.is_deleted = false
+        ORDER BY
+          CASE WHEN dh.status = 'ACTIVE' THEN 1 ELSE 0 END DESC,
+          dh.updated_at DESC,
+          dh.dream_home_id DESC
+        LIMIT 1
+    </select>
+
+    <!-- 드림홈 단건 조회 (with 아파트) -->
+    <select id="findById" resultMap="DreamHomeResultMap">
+        SELECT dh.*, a.apt_nm, a.umd_nm, a.road_nm, a.build_year, a.latitude, a.longitude
+        FROM dream_home dh
+        LEFT JOIN apartment a ON dh.apt_seq = a.apt_seq
+        WHERE dh.dream_home_id = #{dreamHomeId}
+          AND dh.is_deleted = false
+        LIMIT 1
+    </select>
+
     <!-- 드림홈 생성 -->
     <insert id="insert" parameterType="com.jipjung.project.domain.DreamHome"
             useGeneratedKeys="true" keyProperty="dreamHomeId" keyColumn="dream_home_id">

@@ -20,6 +20,7 @@ public class UserCollection {
     private Long collectionId;
     private Long userId;
     private Integer themeId;
+    private Long dreamHomeId;
     private String houseName;
     private LocalDateTime completedAt;
     private Boolean isMainDisplay;
