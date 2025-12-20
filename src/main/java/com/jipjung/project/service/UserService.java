@@ -1,7 +1,9 @@
 package com.jipjung.project.service;
 
+import com.jipjung.project.controller.dto.request.FurnitureProgressRequest;
 import com.jipjung.project.controller.dto.request.OnboardingRequest;
 import com.jipjung.project.controller.dto.request.ProfileUpdateRequest;
+import com.jipjung.project.controller.dto.response.FurnitureProgressResponse;
 import com.jipjung.project.controller.dto.response.OnboardingResponse;
 import com.jipjung.project.controller.dto.response.ProfileUpdateResponse;
 import com.jipjung.project.domain.User;
@@ -191,5 +193,42 @@ public class UserService {
         }
         
         log.info("Account deleted (soft). userId: {}, email: {}", user.getId(), email);
+    }
+
+    /**
+     * 인테리어 진행 상태 업데이트
+     * <p>
+     * 클라이언트에서 계산된 인테리어 단계/EXP를 서버에 저장합니다.
+     * 서버는 값을 검증하고 클램핑하여 저장된 실제 값을 반환합니다.
+     *
+     * @param userId  사용자 ID
+     * @param request 인테리어 진행 상태
+     * @return 저장된 실제 값
+     */
+    @Transactional
+    public FurnitureProgressResponse updateFurnitureProgress(Long userId, FurnitureProgressRequest request) {
+        // 1. 사용자 존재 확인
+        findUserOrThrow(userId);
+
+        // 2. 서버 측 클램핑 (안전한 값 생성)
+        FurnitureProgressRequest safe = request.clamp();
+
+        // 3. DB 업데이트
+        userMapper.updateFurnitureProgress(
+                userId,
+                safe.buildTrack(),
+                safe.furnitureStage(),
+                safe.furnitureExp()
+        );
+
+        log.info("Furniture progress updated. userId: {}, track: {}, stage: {}, exp: {}",
+                userId, safe.buildTrack(), safe.furnitureStage(), safe.furnitureExp());
+
+        // 4. 저장된 값 반환 (클라이언트 동기화용)
+        return new FurnitureProgressResponse(
+                safe.buildTrack(),
+                safe.furnitureStage(),
+                safe.furnitureExp()
+        );
     }
 }

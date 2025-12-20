@@ -53,6 +53,16 @@ public interface UserMapper {
             @Param("existingLoanMonthly") Long existingLoanMonthly
     );
 
+    /**
+     * 인테리어 진행 상태 업데이트
+     */
+    int updateFurnitureProgress(
+            @Param("userId") Long userId,
+            @Param("buildTrack") String buildTrack,
+            @Param("furnitureStage") int furnitureStage,
+            @Param("furnitureExp") int furnitureExp
+    );
+
     // =========================================================================
     // Phase 2: DSR 캐시 관리
     // =========================================================================

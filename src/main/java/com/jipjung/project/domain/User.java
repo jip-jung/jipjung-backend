@@ -60,6 +60,11 @@ public class User {
     private Integer maxStreak;
     private Integer selectedThemeId;
 
+    // 인테리어 진행 상태 (Phase 2: 집 완공 후 가구 배치)
+    private String buildTrack;       // "house" 또는 "furniture"
+    private Integer furnitureStage;  // 0: 미시작, 1-5: 단계
+    private Integer furnitureExp;    // 현재 단계 내 EXP
+
     // 타임스탬프
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

@@ -210,6 +210,14 @@ ALTER TABLE `user` ADD COLUMN max_streak INT DEFAULT 0;
 ALTER TABLE `user` ADD COLUMN selected_theme_id INT;
 ALTER TABLE `user` ADD COLUMN is_deleted BOOLEAN DEFAULT FALSE;
 
+-- 인테리어(가구) 진행 상태 컬럼 (Phase 2: 집 완공 후 가구 배치)
+ALTER TABLE `user` ADD COLUMN build_track VARCHAR(20) NOT NULL DEFAULT 'house' 
+    COMMENT '현재 트랙 (house: 집 짓기, furniture: 인테리어)';
+ALTER TABLE `user` ADD COLUMN furniture_stage INT NOT NULL DEFAULT 0 
+    COMMENT '인테리어 단계 (0: 미시작, 1-5: 진행 중)';
+ALTER TABLE `user` ADD COLUMN furniture_exp INT NOT NULL DEFAULT 0 
+    COMMENT '현재 인테리어 단계 내 경험치';
+
 -- ----------------------------------------------------------------------------
 -- 3.10 dream_home - 드림홈(목표) 테이블
 -- ----------------------------------------------------------------------------

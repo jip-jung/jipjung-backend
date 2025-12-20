@@ -33,6 +33,9 @@
         <result property="lastStreakDate" column="last_streak_date"/>
         <result property="maxStreak" column="max_streak"/>
         <result property="selectedThemeId" column="selected_theme_id"/>
+        <result property="buildTrack" column="build_track"/>
+        <result property="furnitureStage" column="furniture_stage"/>
+        <result property="furnitureExp" column="furniture_exp"/>
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
     </resultMap>
@@ -96,6 +99,17 @@
         SET nickname = #{nickname},
             annual_income = #{annualIncome},
             existing_loan_monthly = #{existingLoanMonthly},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = #{userId}
+          AND is_deleted = false
+    </update>
+
+    <!-- 인테리어 진행 상태 업데이트 -->
+    <update id="updateFurnitureProgress">
+        UPDATE `user`
+        SET build_track = #{buildTrack},
+            furniture_stage = #{furnitureStage},
+            furniture_exp = #{furnitureExp},
             updated_at = CURRENT_TIMESTAMP
         WHERE user_id = #{userId}
           AND is_deleted = false
