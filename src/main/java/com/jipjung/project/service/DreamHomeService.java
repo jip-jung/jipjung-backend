@@ -138,6 +138,7 @@ public class DreamHomeService {
                 .currentSavedAmount(savedAmount)
                 .startDate(LocalDate.now())
                 .status(DreamHomeStatus.ACTIVE)
+                .houseName(request.houseName())
                 .build();
     }
 

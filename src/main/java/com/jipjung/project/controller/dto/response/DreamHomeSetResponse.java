@@ -28,8 +28,11 @@ public record DreamHomeSetResponse(
             @Schema(description = "아파트 코드", example = "11410-61")
             String aptSeq,
 
-            @Schema(description = "아파트명", example = "금천현대")
+            @Schema(description = "표시명 (houseName 우선, 없으면 아파트명)", example = "우리 가족의 첣 집")
             String propertyName,
+
+            @Schema(description = "사용자 정의 집 이름 (nullable)", example = "우리 가족의 첣 집")
+            String houseName,
 
             @Schema(description = "위치", example = "서울 서대문구 홍제동")
             String location,
@@ -57,12 +60,18 @@ public record DreamHomeSetResponse(
     public static DreamHomeSetResponse from(DreamHome dreamHome, Apartment apartment, Long latestDealPrice) {
         int dDay = calculateDDay(dreamHome.getTargetDate());
         String location = buildLocation(apartment);
+        
+        // houseName이 있으면 그것을 사용, 없으면 aptNm
+        String aptNm = apartment != null ? apartment.getAptNm() : null;
+        String houseName = dreamHome.getHouseName();
+        String displayName = (houseName != null && !houseName.isBlank()) ? houseName : aptNm;
 
         return new DreamHomeSetResponse(
                 new DreamHomeInfo(
                         dreamHome.getDreamHomeId(),
                         dreamHome.getAptSeq(),
-                        apartment != null ? apartment.getAptNm() : null,
+                        displayName,
+                        houseName,
                         location,
                         latestDealPrice,
                         dreamHome.getTargetAmount(),

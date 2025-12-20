@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 
@@ -35,7 +36,11 @@ public record DreamHomeSetRequest(
 
         @Schema(description = "선택한 테마 ID (선택, 양수만 허용)", example = "1")
         @Positive(message = "테마 ID는 양수여야 합니다")
-        Integer themeId
+        Integer themeId,
+
+        @Schema(description = "사용자 정의 집 이름 (선택, 없으면 아파트명 사용)", example = "우리 가족의 첫 집")
+        @Size(max = 50, message = "집 이름은 50자 이하여야 합니다")
+        String houseName
 ) {
 }
 

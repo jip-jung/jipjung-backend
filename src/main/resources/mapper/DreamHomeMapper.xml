@@ -19,6 +19,7 @@
         <result property="createdAt" column="created_at"/>
         <result property="updatedAt" column="updated_at"/>
         <result property="isDeleted" column="is_deleted"/>
+        <result property="houseName" column="house_name"/>
         <!-- 아파트 정보 조인 -->
         <association property="apartment" javaType="com.jipjung.project.domain.Apartment">
             <id property="aptSeq" column="apt_seq"/>
@@ -70,8 +71,8 @@
     <!-- 드림홈 생성 -->
     <insert id="insert" parameterType="com.jipjung.project.domain.DreamHome"
             useGeneratedKeys="true" keyProperty="dreamHomeId" keyColumn="dream_home_id">
-        INSERT INTO dream_home (user_id, apt_seq, target_amount, target_date, monthly_goal, current_saved_amount, start_date, status)
-        VALUES (#{userId}, #{aptSeq}, #{targetAmount}, #{targetDate}, #{monthlyGoal}, #{currentSavedAmount}, #{startDate}, #{status})
+        INSERT INTO dream_home (user_id, apt_seq, target_amount, target_date, monthly_goal, current_saved_amount, start_date, status, house_name)
+        VALUES (#{userId}, #{aptSeq}, #{targetAmount}, #{targetDate}, #{monthlyGoal}, #{currentSavedAmount}, #{startDate}, #{status}, #{houseName})
     </insert>
 
     <!-- 드림홈 목표 업데이트 (저축액 유지) -->
@@ -82,6 +83,7 @@
             target_date = #{targetDate},
             monthly_goal = #{monthlyGoal},
             start_date = #{startDate},
+            house_name = #{houseName},
             status = 'ACTIVE',
             updated_at = CURRENT_TIMESTAMP
         WHERE dream_home_id = #{dreamHomeId}
