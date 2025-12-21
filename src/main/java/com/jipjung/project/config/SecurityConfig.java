@@ -25,6 +25,7 @@ import org.springframework.security.web.authentication.logout.LogoutFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.util.Arrays;
 
@@ -39,6 +40,7 @@ public class SecurityConfig {
     private final UserPreferredAreaMapper userPreferredAreaMapper;
 
     @Bean
+    @ConditionalOnProperty(prefix = "app.security", name = "enabled", havingValue = "true", matchIfMissing = true)
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 // CSRF 비활성화 (JWT 사용)
@@ -66,6 +68,7 @@ public class SecurityConfig {
                         .requestMatchers("/test/**", "/health").permitAll()  // 테스트용 경로
                         .requestMatchers("/h2-console/**").permitAll()  // H2 콘솔
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()  // Swagger
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")  // 관리자 API - ROLE_ADMIN 필요
                         .requestMatchers("/api/apartments/favorites/**").authenticated()  // 관심 아파트 - 인증 필요
                         .requestMatchers("/api/apartments/**").permitAll()  // 아파트 조회 - 공개
                         .anyRequest().authenticated()  // 나머지는 인증 필요
@@ -74,6 +77,21 @@ public class SecurityConfig {
                 // 필터 추가
                 .addFilterAfter(customJsonUsernamePasswordAuthenticationFilter(), LogoutFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter(), CustomJsonUsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+
+    @Bean
+    @ConditionalOnProperty(prefix = "app.security", name = "enabled", havingValue = "false")
+    public SecurityFilterChain permitAllFilterChain(HttpSecurity http) throws Exception {
+        http
+                .csrf(AbstractHttpConfigurer::disable)
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .formLogin(AbstractHttpConfigurer::disable)
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.sameOrigin()))
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
 
         return http.build();
     }
