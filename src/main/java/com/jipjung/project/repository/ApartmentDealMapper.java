@@ -31,6 +31,18 @@ public interface ApartmentDealMapper {
     Long findAverageRecentDealAmountByGugun(@Param("gugunName") String gugunName);
 
     /**
+     * 아파트의 최신 거래 금액 조회 (만원 단위)
+     */
+    @Select("""
+        SELECT ad.deal_amount_num
+        FROM apartment_deal ad
+        WHERE ad.apt_seq = #{aptSeq}
+        ORDER BY ad.deal_date DESC, ad.deal_no DESC
+        LIMIT 1
+    """)
+    Long findLatestDealAmountNumByAptSeq(@Param("aptSeq") String aptSeq);
+
+    /**
      * 거래 내역 삽입 (중복은 유니크 키로 무시)
      *
      * @param deal 거래 정보

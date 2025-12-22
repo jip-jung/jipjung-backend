@@ -35,6 +35,10 @@ public enum ErrorCode {
     // 400 Bad Request - Theme
     THEME_NOT_ACTIVE(400, "비활성화된 테마입니다"),
 
+    // 400 Bad Request - Dream Home Target
+    TARGET_CHANGE_NOT_ALLOWED(400, "저축 진행 중에는 목표를 변경할 수 없습니다"),
+    TARGET_LESS_THAN_SAVED(400, "저축 목표는 현재 저축액보다 작을 수 없습니다"),
+
     // 409 Conflict
     DUPLICATE_EMAIL(409, "이미 존재하는 이메일입니다"),
     DUPLICATE_FAVORITE(409, "이미 관심 아파트로 등록되어 있습니다"),
