@@ -69,4 +69,18 @@ public interface DailyActivityMapper {
      * @return 영향받은 행 수
      */
     int insert(DailyActivity dailyActivity);
+
+    /**
+     * 기간 내 활동 이벤트 조회 (created_at 기준)
+     *
+     * @param userId 사용자 ID
+     * @param startAt 시작 시각
+     * @param endAt 종료 시각
+     * @return 활동 이벤트 목록
+     */
+    java.util.List<java.util.Map<String, Object>> findExpEventsByUserIdAndDateRange(
+            @Param("userId") Long userId,
+            @Param("startAt") java.time.LocalDateTime startAt,
+            @Param("endAt") java.time.LocalDateTime endAt
+    );
 }

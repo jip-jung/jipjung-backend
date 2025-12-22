@@ -7,13 +7,19 @@ import com.jipjung.project.controller.dto.response.JourneyResponse.CollectionInf
 import com.jipjung.project.controller.dto.response.JourneyResponse.JourneyEvent;
 import com.jipjung.project.controller.dto.response.JourneyResponse.JourneySummary;
 import com.jipjung.project.controller.dto.response.JourneyResponse.PhaseInfo;
+import com.jipjung.project.domain.ActivityType;
+import com.jipjung.project.domain.Apartment;
 import com.jipjung.project.domain.DreamHome;
 import com.jipjung.project.domain.User;
 import com.jipjung.project.domain.UserCollection;
 import com.jipjung.project.global.exception.BusinessException;
 import com.jipjung.project.global.exception.ErrorCode;
+import com.jipjung.project.repository.AiConversationMapper;
 import com.jipjung.project.repository.ApartmentMapper;
 import com.jipjung.project.repository.CollectionMapper;
+import com.jipjung.project.repository.DailyActivityMapper;
+import com.jipjung.project.repository.DreamHomeMapper;
+import com.jipjung.project.repository.StreakMilestoneRewardMapper;
 import com.jipjung.project.repository.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,6 +56,10 @@ public class CollectionService {
     private final CollectionMapper collectionMapper;
     private final UserMapper userMapper;
     private final ApartmentMapper apartmentMapper;
+    private final DreamHomeMapper dreamHomeMapper;
+    private final AiConversationMapper aiConversationMapper;
+    private final DailyActivityMapper dailyActivityMapper;
+    private final StreakMilestoneRewardMapper milestoneRewardMapper;
 
     // Phase 관련 상수 (PRD 3.1.3 참조)
     private static final int HOUSE_PHASES = 6;  // 집 짓기 단계
@@ -66,7 +76,11 @@ public class CollectionService {
             "바닥·벽 정돈", "휴식 공간", "기능 더하기", "분위기 완성", "인테리어 완성"
     );
 
-    private static final String EVENT_DEPOSIT = "DEPOSIT";
+    private static final String EVENT_SAVINGS_DEPOSIT = "SAVINGS_DEPOSIT";
+    private static final String EVENT_SAVINGS_WITHDRAW = "SAVINGS_WITHDRAW";
+    private static final String EVENT_AI_JUDGMENT = "AI_JUDGMENT";
+    private static final String EVENT_STREAK_PREFIX = "STREAK_";
+    private static final String EVENT_STREAK_MILESTONE = "STREAK_MILESTONE";
     private static final String EVENT_LEVEL_UP = "LEVEL_UP";
     private static final String EVENT_HOUSE_COMPLETE = "HOUSE_COMPLETE";
     private static final String EVENT_FURNITURE_UNLOCKED = "FURNITURE_UNLOCKED";
@@ -92,8 +106,8 @@ public class CollectionService {
                 .map(CollectionItem::fromMap)
                 .toList();
 
-        // 진행 중인 드림홈 정보 조회 (additive change)
-        CollectionResponse.InProgressInfo inProgress = CollectionResponse.InProgressInfo.fromMap(inProgressData);
+        // 진행 중인 드림홈 정보 조회 (XP 기반 단계 계산)
+        CollectionResponse.InProgressInfo inProgress = buildInProgressInfo(userId, inProgressData);
 
         return new CollectionResponse(collections, collections.size(), hasActiveGoal, inProgress);
     }
@@ -124,19 +138,25 @@ public class CollectionService {
         if (dreamHomeId == null) {
             throw new BusinessException(ErrorCode.DREAM_HOME_NOT_FOUND);
         }
+        DreamHome dreamHome = dreamHomeMapper.findById(dreamHomeId);
 
-        // 저축 이벤트 조회
-        List<Map<String, Object>> events = collectionMapper.findJourneyEvents(dreamHomeId);
+        Long targetAmount = dreamHome != null ? dreamHome.getTargetAmount() : getLong(inProgressData, "target_amount");
+        int targetExp = ExpPolicy.calculateTargetExp(targetAmount);
+        int safeTargetExp = Math.max(1, targetExp);
 
-        Long targetAmount = getLong(inProgressData, "target_amount");
         String themeCode = Objects.requireNonNullElse(getString(inProgressData, "theme_code"), "CLASSIC");
         String propertyName = getString(inProgressData, "property_name");
         String location = getString(inProgressData, "location");
 
-        // 시작일 추정 (첫 저축 이벤트 기준)
-        LocalDate startDate = events.isEmpty() ? LocalDate.now() 
-                : getLocalDate(events.get(0), "date");
-        if (startDate == null) startDate = LocalDate.now();
+        LocalDateTime startAt = resolveJourneyStart(dreamHome);
+        LocalDateTime endAt = LocalDateTime.now();
+
+        JourneyEventData eventData = loadJourneyEvents(userId, dreamHomeId, startAt, endAt);
+        JourneyPhaseResult phaseResult = buildPhasesFromEvents(eventData.events(), safeTargetExp, themeCode);
+        int totalExp = phaseResult.totalExp();
+        int currentPhase = phaseResult.currentPhase();
+
+        LocalDate startDate = resolveJourneyStartDate(dreamHome, eventData.events());
 
         CollectionInfo collectionInfo = new CollectionInfo(
                 null, // 진행 중이므로 collectionId 없음
@@ -148,25 +168,19 @@ public class CollectionService {
 
         // 진행 중이므로 완료일은 null, 현재까지 소요 기간
         int totalDays = Math.max(0, (int) ChronoUnit.DAYS.between(startDate, LocalDate.now()));
-        long totalDeposits = events.stream()
-                .filter(e -> EVENT_DEPOSIT.equals(getString(e, "event_type")))
-                .count();
 
-        JourneySummary summary = new JourneySummary(
+        JourneySummary summary = buildJourneySummary(
                 startDate,
-                null, // 아직 완료되지 않음
+                null,
                 totalDays,
-                (int) totalDeposits,
-                targetAmount
+                eventData.totalDeposits(),
+                targetAmount,
+                targetExp,
+                totalExp,
+                currentPhase
         );
 
-        List<PhaseInfo> phases = buildPhasesFromEvents(
-                events,
-                Math.max(1L, targetAmount != null ? targetAmount : 1L),
-                themeCode
-        );
-
-        return new JourneyResponse(collectionInfo, summary, phases);
+        return new JourneyResponse(collectionInfo, summary, phaseResult.phases());
     }
 
     // =========================================================================
@@ -174,10 +188,10 @@ public class CollectionService {
     // =========================================================================
 
     /**
-     * 저축 여정 상세 조회 (리플레이용)
+     * 여정 상세 조회 (리플레이용)
      * <p>
      * 저축 이벤트를 Phase별로 그룹핑하여 반환합니다.
-     * Phase 경계는 목표 금액을 11등분하여 계산합니다.
+     * Phase 경계는 목표 XP 대비 누적 XP 비율로 계산합니다.
      *
      * @param userId       로그인 사용자 ID
      * @param collectionId 컬렉션 ID
@@ -219,20 +233,33 @@ public class CollectionService {
                 detail.location()
         );
 
-        // 저축 이벤트 조회
-        List<Map<String, Object>> events = collectionMapper.findJourneyEvents(collection.getDreamHomeId());
+        DreamHome dreamHome = dreamHomeMapper.findById(collection.getDreamHomeId());
+        Long targetAmount = detail.targetAmount();
+        int targetExp = ExpPolicy.calculateTargetExp(targetAmount);
+        int safeTargetExp = Math.max(1, targetExp);
 
-        // 여정 요약
-        JourneySummary summary = buildJourneySummary(startDate, completedDate, events, detail.targetAmount());
+        LocalDateTime startAt = resolveJourneyStart(dreamHome, startDate);
+        LocalDateTime endAt = collection.getCompletedAt() != null
+                ? collection.getCompletedAt()
+                : LocalDateTime.now();
 
-        // Phase별 그룹핑
-        List<PhaseInfo> phases = buildPhasesFromEvents(
-                events,
-                Math.max(1L, detail.targetAmount()),
-                collectionInfo.themeCode()
+        JourneyEventData eventData = loadJourneyEvents(userId, collection.getDreamHomeId(), startAt, endAt);
+        JourneyPhaseResult phaseResult = buildPhasesFromEvents(eventData.events(), safeTargetExp, collectionInfo.themeCode());
+        int totalExp = phaseResult.totalExp();
+        int currentPhase = phaseResult.currentPhase();
+
+        JourneySummary summary = buildJourneySummary(
+                startDate,
+                completedDate,
+                calculateDurationDays(startDate, completedDate),
+                eventData.totalDeposits(),
+                targetAmount,
+                targetExp,
+                totalExp,
+                currentPhase
         );
 
-        return new JourneyResponse(collectionInfo, summary, phases);
+        return new JourneyResponse(collectionInfo, summary, phaseResult.phases());
     }
 
     // =========================================================================
@@ -274,13 +301,14 @@ public class CollectionService {
      * @param newSavedAmount 최종 저축 금액
      */
     @Transactional
-    public void registerOnCompletion(Long userId, DreamHome dreamHome, long newSavedAmount) {
+    public Long registerOnCompletion(Long userId, DreamHome dreamHome, long newSavedAmount) {
         if (dreamHome == null || dreamHome.getDreamHomeId() == null) {
-            return;
+            return null;
         }
 
-        if (collectionMapper.findByDreamHomeId(dreamHome.getDreamHomeId()) != null) {
-            return;
+        UserCollection existingCollection = collectionMapper.findByDreamHomeId(dreamHome.getDreamHomeId());
+        if (existingCollection != null) {
+            return existingCollection.getCollectionId();
         }
 
         User user = requireUser(userId);
@@ -290,9 +318,12 @@ public class CollectionService {
             collectionMapper.insert(collection);
             log.info("Collection registered. userId: {}, dreamHomeId: {}, collectionId: {}",
                     userId, dreamHome.getDreamHomeId(), collection.getCollectionId());
+            return collection.getCollectionId();
         } catch (DuplicateKeyException e) {
             // 멱등성: 이미 등록된 경우 무시 (경쟁 조건 포함)
             log.debug("Collection already exists for dreamHomeId: {}", dreamHome.getDreamHomeId());
+            UserCollection duplicate = collectionMapper.findByDreamHomeId(dreamHome.getDreamHomeId());
+            return duplicate != null ? duplicate.getCollectionId() : null;
         }
     }
 
@@ -323,11 +354,15 @@ public class CollectionService {
     }
 
     private String resolveHouseName(DreamHome dreamHome) {
+        String houseName = dreamHome.getHouseName();
+        if (houseName != null && !houseName.isBlank()) {
+            return houseName;
+        }
         if (dreamHome.getAptSeq() == null) {
             return null;
         }
         return apartmentMapper.findByAptSeq(dreamHome.getAptSeq())
-                .map(a -> a.getAptNm())
+                .map(Apartment::getAptNm)
                 .orElse(null);
     }
 
@@ -349,43 +384,292 @@ public class CollectionService {
         return collection;
     }
 
+    private CollectionResponse.InProgressInfo buildInProgressInfo(Long userId, Map<String, Object> inProgressData) {
+        if (inProgressData == null) {
+            return null;
+        }
+
+        Long dreamHomeId = getLong(inProgressData, "dream_home_id");
+        if (dreamHomeId == null) {
+            return CollectionResponse.InProgressInfo.fromMap(inProgressData);
+        }
+
+        DreamHome dreamHome = dreamHomeMapper.findById(dreamHomeId);
+        Long targetAmount = dreamHome != null ? dreamHome.getTargetAmount() : getLong(inProgressData, "target_amount");
+        int targetExp = ExpPolicy.calculateTargetExp(targetAmount);
+        int safeTargetExp = Math.max(1, targetExp);
+
+        LocalDateTime startAt = resolveJourneyStart(dreamHome);
+        JourneyEventData eventData = loadJourneyEvents(userId, dreamHomeId, startAt, LocalDateTime.now());
+        JourneyProgressSnapshot snapshot = calculateProgressSnapshot(eventData.events(), safeTargetExp);
+
+        return CollectionResponse.InProgressInfo.fromMap(inProgressData, snapshot.currentPhase());
+    }
+
     /**
      * 여정 요약 정보 생성
      */
     private JourneySummary buildJourneySummary(
             LocalDate startDate,
             LocalDate completedDate,
-            List<Map<String, Object>> events,
-            Long targetAmount
+            int totalDays,
+            int totalDeposits,
+            Long targetAmount,
+            int targetExp,
+            int totalExp,
+            int currentPhase
     ) {
-        int totalDays = Math.max(0, (int) ChronoUnit.DAYS.between(startDate, completedDate));
-
-        long totalDeposits = events.stream()
-                .filter(e -> EVENT_DEPOSIT.equals(getString(e, "event_type")))
-                .count();
-
         return new JourneySummary(
                 startDate,
                 completedDate,
                 totalDays,
-                (int) totalDeposits,
-                targetAmount
+                totalDeposits,
+                targetAmount,
+                targetExp > 0 ? targetExp : null,
+                totalExp,
+                currentPhase
         );
     }
 
+    private JourneyEventData loadJourneyEvents(
+            Long userId,
+            Long dreamHomeId,
+            LocalDateTime startAt,
+            LocalDateTime endAt
+    ) {
+        LocalDateTime safeStart = startAt != null ? startAt : LocalDateTime.now();
+        LocalDateTime safeEnd = endAt != null ? endAt : LocalDateTime.now();
+        if (safeEnd.isBefore(safeStart)) {
+            LocalDateTime tmp = safeStart;
+            safeStart = safeEnd;
+            safeEnd = tmp;
+        }
+
+        List<JourneyXpEvent> events = new ArrayList<>();
+        int totalDeposits = 0;
+
+        List<Map<String, Object>> savingsEvents = collectionMapper.findJourneyEvents(dreamHomeId);
+        for (Map<String, Object> raw : savingsEvents) {
+            LocalDateTime date = getLocalDateTime(raw, "date");
+            if (!isWithinRange(date, safeStart, safeEnd)) {
+                continue;
+            }
+
+            String saveType = getString(raw, "event_type");
+            Long amount = getLong(raw, "amount");
+            String memo = getString(raw, "memo");
+
+            boolean isDeposit = "DEPOSIT".equalsIgnoreCase(saveType);
+            int expChange = isDeposit ? ExpPolicy.calculateSavingsExp(amount) : 0;
+            if (isDeposit) {
+                totalDeposits++;
+            }
+
+            String eventType = isDeposit ? EVENT_SAVINGS_DEPOSIT : EVENT_SAVINGS_WITHDRAW;
+            events.add(new JourneyXpEvent(
+                    getLong(raw, "event_id"),
+                    eventType,
+                    date,
+                    expChange,
+                    memo,
+                    amount
+            ));
+        }
+
+        List<Map<String, Object>> aiEvents = aiConversationMapper.findJudgedEventsByUserIdAndDateRange(
+                userId, safeStart, safeEnd
+        );
+        for (Map<String, Object> raw : aiEvents) {
+            LocalDateTime date = getLocalDateTime(raw, "updated_at");
+            if (!isWithinRange(date, safeStart, safeEnd)) {
+                continue;
+            }
+            int expChange = nullToZero(getInt(raw, "exp_change"));
+            String result = getString(raw, "judgment_result");
+            Integer score = getInt(raw, "judgment_score");
+            String memo = buildAiMemo(result, score);
+
+            events.add(new JourneyXpEvent(
+                    getLong(raw, "conversation_id"),
+                    EVENT_AI_JUDGMENT,
+                    date,
+                    expChange,
+                    memo,
+                    null
+            ));
+        }
+
+        List<Map<String, Object>> activityEvents = dailyActivityMapper.findExpEventsByUserIdAndDateRange(
+                userId, safeStart, safeEnd
+        );
+        for (Map<String, Object> raw : activityEvents) {
+            LocalDateTime date = getLocalDateTime(raw, "created_at");
+            if (!isWithinRange(date, safeStart, safeEnd)) {
+                continue;
+            }
+            String activityType = getString(raw, "activity_type");
+            int expEarned = nullToZero(getInt(raw, "exp_earned"));
+            String memo = buildActivityMemo(activityType);
+            String eventType = EVENT_STREAK_PREFIX + normalizeEventType(activityType);
+
+            events.add(new JourneyXpEvent(
+                    getLong(raw, "activity_id"),
+                    eventType,
+                    date,
+                    expEarned,
+                    memo,
+                    null
+            ));
+        }
+
+        List<Map<String, Object>> milestoneEvents = milestoneRewardMapper.findRewardsByUserIdAndDateRange(
+                userId, safeStart, safeEnd
+        );
+        for (Map<String, Object> raw : milestoneEvents) {
+            LocalDateTime date = getLocalDateTime(raw, "claimed_at");
+            if (!isWithinRange(date, safeStart, safeEnd)) {
+                continue;
+            }
+            int expReward = nullToZero(getInt(raw, "exp_reward"));
+            int milestoneDays = nullToZero(getInt(raw, "milestone_days"));
+            String memo = milestoneDays > 0
+                    ? "마일스톤 " + milestoneDays + "일 보상"
+                    : "마일스톤 보상";
+
+            events.add(new JourneyXpEvent(
+                    getLong(raw, "reward_id"),
+                    EVENT_STREAK_MILESTONE,
+                    date,
+                    expReward,
+                    memo,
+                    null
+            ));
+        }
+
+        events.sort(Comparator.comparing(JourneyXpEvent::date)
+                .thenComparing(event -> nullToZero(event.eventId()))
+                .thenComparing(JourneyXpEvent::eventType, Comparator.nullsLast(Comparator.naturalOrder())));
+
+        return new JourneyEventData(events, totalDeposits);
+    }
+
+    private JourneyProgressSnapshot calculateProgressSnapshot(List<JourneyXpEvent> events, int targetExp) {
+        int cumulativeExp = 0;
+        int currentPhase = 1;
+
+        for (JourneyXpEvent event : events) {
+            cumulativeExp = Math.max(0, cumulativeExp + nullToZero(event.expChange()));
+            currentPhase = calculatePhase(cumulativeExp, targetExp);
+        }
+
+        return new JourneyProgressSnapshot(cumulativeExp, currentPhase);
+    }
+
+    private LocalDateTime resolveJourneyStart(DreamHome dreamHome) {
+        if (dreamHome != null && dreamHome.getCreatedAt() != null) {
+            return dreamHome.getCreatedAt();
+        }
+        if (dreamHome != null && dreamHome.getStartDate() != null) {
+            return dreamHome.getStartDate().atStartOfDay();
+        }
+        return LocalDateTime.now();
+    }
+
+    private LocalDateTime resolveJourneyStart(DreamHome dreamHome, LocalDate fallbackDate) {
+        if (dreamHome != null && dreamHome.getCreatedAt() != null) {
+            return dreamHome.getCreatedAt();
+        }
+        if (fallbackDate != null) {
+            return fallbackDate.atStartOfDay();
+        }
+        return LocalDateTime.now();
+    }
+
+    private LocalDate resolveJourneyStartDate(DreamHome dreamHome, List<JourneyXpEvent> events) {
+        if (dreamHome != null && dreamHome.getStartDate() != null) {
+            return dreamHome.getStartDate();
+        }
+        for (JourneyXpEvent event : events) {
+            if (event.date() != null) {
+                return event.date().toLocalDate();
+            }
+        }
+        return LocalDate.now();
+    }
+
+    private static String buildAiMemo(String result, Integer score) {
+        if (result == null && score == null) {
+            return null;
+        }
+        String label = result;
+        if (label == null) {
+            label = "AI 판결";
+        } else {
+            label = switch (label) {
+                case "REASONABLE" -> "합리적 소비";
+                case "WASTE" -> "낭비";
+                default -> label;
+            };
+        }
+        if (score == null) {
+            return "AI 판결: " + label;
+        }
+        return "AI 판결: " + label + " (" + score + "점)";
+    }
+
+    private static String buildActivityMemo(String activityType) {
+        if (activityType == null) {
+            return null;
+        }
+        try {
+            return ActivityType.valueOf(activityType).getLabel();
+        } catch (IllegalArgumentException e) {
+            return activityType;
+        }
+    }
+
+    private static String normalizeEventType(String rawType) {
+        return rawType != null ? rawType.toUpperCase() : "UNKNOWN";
+    }
+
+    private static JourneyEvent toJourneyEvent(JourneyXpEvent event, int cumulativeExp) {
+        return new JourneyEvent(
+                event.eventId(),
+                event.eventType(),
+                event.date(),
+                event.amount(),
+                event.memo(),
+                null,
+                event.expChange(),
+                cumulativeExp
+        );
+    }
+
+    private static boolean isWithinRange(LocalDateTime date, LocalDateTime startAt, LocalDateTime endAt) {
+        if (date == null) {
+            return false;
+        }
+        if (startAt != null && date.isBefore(startAt)) {
+            return false;
+        }
+        return endAt == null || !date.isAfter(endAt);
+    }
+
     /**
-     * 이벤트를 Phase별로 그룹핑 (단방향 진행 + 시스템 이벤트 생성)
+     * 이벤트를 Phase별로 그룹핑 (XP 기준)
      * <p>
      * 규칙:
-     * - 단계 진행은 단방향(최고 누적합 기준)입니다. WITHDRAW로 누적이 줄어도 단계는 되돌아가지 않습니다.
-     * - 한 번의 DEPOSIT로 여러 단계 점프 시, 점프한 각 단계마다 LEVEL_UP 이벤트를 생성합니다.
+     * - 누적 XP 기준으로 Phase를 계산하며, XP 감소 시 단계도 내려갈 수 있습니다 (1 미만 불가).
+     * - 한 번의 이벤트로 여러 단계 점프 시, 점프한 각 단계마다 LEVEL_UP 이벤트를 생성합니다.
      */
-    private List<PhaseInfo> buildPhasesFromEvents(List<Map<String, Object>> rawEvents,
-                                                 long targetAmount,
-                                                 String themeCode) {
-        List<JourneyEvent> events = rawEvents.stream()
-                .map(JourneyEvent::fromMap)
-                .sorted(Comparator.comparing(JourneyEvent::date, Comparator.nullsLast(Comparator.naturalOrder())))
+    private JourneyPhaseResult buildPhasesFromEvents(List<JourneyXpEvent> rawEvents,
+                                                     int targetExp,
+                                                     String themeCode) {
+        List<JourneyXpEvent> events = rawEvents.stream()
+                .filter(event -> event.date() != null)
+                .sorted(Comparator.comparing(JourneyXpEvent::date)
+                        .thenComparing(event -> nullToZero(event.eventId()))
+                        .thenComparing(JourneyXpEvent::eventType, Comparator.nullsLast(Comparator.naturalOrder())))
                 .toList();
 
         Map<Integer, List<JourneyEvent>> phaseEvents = new LinkedHashMap<>();
@@ -395,15 +679,15 @@ public class CollectionService {
         }
 
         LocalDateTime[] phaseReachedAt = new LocalDateTime[TOTAL_PHASES + 1];
-        Long[] phaseCumulativeAmount = new Long[TOTAL_PHASES + 1];
+        Integer[] phaseCumulativeExp = new Integer[TOTAL_PHASES + 1];
 
-        long maxCumulativeSoFar = 0L;
+        int cumulativeExp = 0;
         int currentPhase = 1;
 
-        for (JourneyEvent event : events) {
-            long cumulative = nullToZero(event.cumulativeTotal());
-            long nextMax = Math.max(maxCumulativeSoFar, cumulative);
-            int nextPhase = calculatePhase(nextMax, targetAmount);
+        for (JourneyXpEvent event : events) {
+            int expChange = nullToZero(event.expChange());
+            cumulativeExp = Math.max(0, cumulativeExp + expChange);
+            int nextPhase = calculatePhase(cumulativeExp, targetExp);
 
             if (nextPhase > currentPhase) {
                 addPhaseJumpSystemEvents(
@@ -412,22 +696,20 @@ public class CollectionService {
                         nextPhase,
                         event,
                         phaseReachedAt,
-                        phaseCumulativeAmount,
-                        nextMax
+                        phaseCumulativeExp,
+                        cumulativeExp
                 );
             }
 
-            maxCumulativeSoFar = nextMax;
             currentPhase = nextPhase;
 
-            // 실제 저축/인출 이벤트는 현재 단계(최고치 기준)에 포함
             addToPhase(
                     phaseEvents,
                     currentPhase,
-                    event,
+                    toJourneyEvent(event, cumulativeExp),
                     phaseReachedAt,
-                    phaseCumulativeAmount,
-                    maxCumulativeSoFar
+                    phaseCumulativeExp,
+                    cumulativeExp
             );
         }
 
@@ -441,22 +723,23 @@ public class CollectionService {
                     themeCode,
                     stageNumber,
                     phaseReachedAt[i],
-                    phaseCumulativeAmount[i],
+                    null,
+                    phaseCumulativeExp[i],
                     phaseEvents.get(i)
             ));
         }
 
-        return result;
+        return new JourneyPhaseResult(result, cumulativeExp, currentPhase);
     }
 
     private static void addPhaseJumpSystemEvents(
             Map<Integer, List<JourneyEvent>> phaseEvents,
             int currentPhase,
             int nextPhase,
-            JourneyEvent triggerEvent,
+            JourneyXpEvent triggerEvent,
             LocalDateTime[] phaseReachedAt,
-            Long[] phaseCumulativeAmount,
-            long cumulativeAmount
+            Integer[] phaseCumulativeExp,
+            int cumulativeExp
     ) {
         // 단계 점프: 각 단계별 시스템 이벤트 생성 (LEVEL_UP 등)
         for (int phase = currentPhase + 1; phase <= nextPhase; phase++) {
@@ -465,20 +748,20 @@ public class CollectionService {
             addToPhase(
                     phaseEvents,
                     phase,
-                    systemEvent(EVENT_LEVEL_UP, date, buildLevelUpMemo(phase), cumulativeAmount),
+                    systemEvent(EVENT_LEVEL_UP, date, buildLevelUpMemo(phase), cumulativeExp),
                     phaseReachedAt,
-                    phaseCumulativeAmount,
-                    cumulativeAmount
+                    phaseCumulativeExp,
+                    cumulativeExp
             );
 
             if (phase == HOUSE_PHASES) {
                 addToPhase(
                         phaseEvents,
                         phase,
-                        systemEvent(EVENT_HOUSE_COMPLETE, date, "🏠 드디어 집 완공!", cumulativeAmount),
+                        systemEvent(EVENT_HOUSE_COMPLETE, date, "🏠 드디어 집 완공!", cumulativeExp),
                         phaseReachedAt,
-                        phaseCumulativeAmount,
-                        cumulativeAmount
+                        phaseCumulativeExp,
+                        cumulativeExp
                 );
             }
 
@@ -490,11 +773,11 @@ public class CollectionService {
                                 EVENT_FURNITURE_UNLOCKED,
                                 date,
                                 "🛋️ 가구 레이어 해금: " + phaseNameOf(phase),
-                                cumulativeAmount
+                                cumulativeExp
                         ),
                         phaseReachedAt,
-                        phaseCumulativeAmount,
-                        cumulativeAmount
+                        phaseCumulativeExp,
+                        cumulativeExp
                 );
             }
 
@@ -502,26 +785,26 @@ public class CollectionService {
                 addToPhase(
                         phaseEvents,
                         phase,
-                        systemEvent(EVENT_JOURNEY_COMPLETE, date, "🥳 인테리어까지 완성!", cumulativeAmount),
+                        systemEvent(EVENT_JOURNEY_COMPLETE, date, "🥳 인테리어까지 완성!", cumulativeExp),
                         phaseReachedAt,
-                        phaseCumulativeAmount,
-                        cumulativeAmount
+                        phaseCumulativeExp,
+                        cumulativeExp
                 );
             }
         }
     }
 
-    private static JourneyEvent systemEvent(String eventType, LocalDateTime date, String memo, long cumulativeAmount) {
-        return new JourneyEvent(null, eventType, date, 0L, memo, cumulativeAmount);
+    private static JourneyEvent systemEvent(String eventType, LocalDateTime date, String memo, int cumulativeExp) {
+        return new JourneyEvent(null, eventType, date, null, memo, null, 0, cumulativeExp);
     }
 
     /**
-     * 누적 금액으로 Phase 계산 (1-11)
+     * 누적 XP로 Phase 계산 (1-11)
      */
-    private int calculatePhase(long cumulativeAmount, long targetAmount) {
-        long safeTargetAmount = Math.max(1L, targetAmount);
-        long numerator = Math.max(0L, cumulativeAmount) * TOTAL_PHASES;
-        int phase = (int) (numerator / safeTargetAmount) + 1;
+    private int calculatePhase(int totalExp, int targetExp) {
+        int safeTargetExp = Math.max(1, targetExp);
+        long numerator = (long) Math.max(0, totalExp) * TOTAL_PHASES;
+        int phase = (int) (numerator / safeTargetExp) + 1;
         return Math.max(1, Math.min(phase, TOTAL_PHASES));
     }
 
@@ -538,8 +821,8 @@ public class CollectionService {
             int phase,
             JourneyEvent event,
             LocalDateTime[] phaseReachedAt,
-            Long[] phaseCumulativeAmount,
-            long cumulativeAmount
+            Integer[] phaseCumulativeExp,
+            int cumulativeExp
     ) {
         if (phase < 1 || phase > TOTAL_PHASES) {
             return;
@@ -551,11 +834,11 @@ public class CollectionService {
             phaseReachedAt[phase] = event.date();
         }
 
-        Long current = phaseCumulativeAmount[phase];
+        Integer current = phaseCumulativeExp[phase];
         if (current == null) {
-            phaseCumulativeAmount[phase] = cumulativeAmount;
+            phaseCumulativeExp[phase] = cumulativeExp;
         } else {
-            phaseCumulativeAmount[phase] = Math.max(current, cumulativeAmount);
+            phaseCumulativeExp[phase] = Math.max(current, cumulativeExp);
         }
     }
 
@@ -574,12 +857,24 @@ public class CollectionService {
         return val != null ? val : 0L;
     }
 
+    private static int nullToZero(Integer val) {
+        return val != null ? val : 0;
+    }
+
     // Map 헬퍼
     private static Long getLong(Map<String, Object> map, String key) {
         Object val = map.get(key);
         if (val == null) return null;
         if (val instanceof Long l) return l;
         if (val instanceof Number n) return n.longValue();
+        return null;
+    }
+
+    private static Integer getInt(Map<String, Object> map, String key) {
+        Object val = map.get(key);
+        if (val == null) return null;
+        if (val instanceof Integer i) return i;
+        if (val instanceof Number n) return n.intValue();
         return null;
     }
 
@@ -595,6 +890,28 @@ public class CollectionService {
         if (val instanceof java.sql.Timestamp ts) return ts.toLocalDateTime().toLocalDate();
         return null;
     }
+
+    private static LocalDateTime getLocalDateTime(Map<String, Object> map, String key) {
+        Object val = map.get(key);
+        if (val instanceof LocalDateTime ldt) return ldt;
+        if (val instanceof java.sql.Timestamp ts) return ts.toLocalDateTime();
+        return null;
+    }
+
+    private record JourneyXpEvent(
+            Long eventId,
+            String eventType,
+            LocalDateTime date,
+            Integer expChange,
+            String memo,
+            Long amount
+    ) {}
+
+    private record JourneyEventData(List<JourneyXpEvent> events, int totalDeposits) {}
+
+    private record JourneyPhaseResult(List<PhaseInfo> phases, int totalExp, int currentPhase) {}
+
+    private record JourneyProgressSnapshot(int totalExp, int currentPhase) {}
 
     private record JourneyCollectionDetail(
             Long targetAmount,
