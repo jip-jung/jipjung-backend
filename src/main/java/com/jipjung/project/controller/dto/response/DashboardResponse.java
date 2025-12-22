@@ -134,22 +134,32 @@ public record DashboardResponse(
     // Nested Records: Goal Section
     // ==========================================================================
 
+    /**
+     * 목표 섹션
+     * <p>
+     * V2 리팩토링: 저축 목표(targetAmount)와 매물 정보(linkedProperty)를 분리
+     * <ul>
+     *   <li>targetAmount: 사용자가 설정한 저축 목표 (게이미피케이션 기준)</li>
+     *   <li>linkedProperty: 참조용 매물 정보 (Gap 표시용, nullable)</li>
+     * </ul>
+     */
     @Schema(description = "목표 섹션")
     public record GoalSection(
             @Schema(description = "드림홈 ID") Long dreamHomeId,
             @Schema(description = "목표 아파트명 (houseName 우선, 없으면 아파트명)") String targetPropertyName,
             @Schema(description = "사용자 정의 집 이름 (nullable)") String houseName,
-            @Schema(description = "목표 금액") long totalAmount,
+            @Schema(description = "저축 목표 (사용자 설정)") long targetAmount,
             @Schema(description = "저축 금액") long savedAmount,
-            @Schema(description = "남은 금액") long remainingAmount,
+            @Schema(description = "남은 금액 (목표 - 저축)") long remainingAmount,
             @Schema(description = "달성률 (%)") double achievementRate,
-            @Schema(description = "완료 여부") boolean isCompleted
+            @Schema(description = "완료 여부") boolean isCompleted,
+            @Schema(description = "연결된 매물 정보 (참조용, nullable)") LinkedProperty linkedProperty
     ) {
         private static final String NO_GOAL_MESSAGE = "목표를 설정해주세요";
 
         public static GoalSection from(DreamHome dreamHome) {
             if (dreamHome == null) {
-                return new GoalSection(null, NO_GOAL_MESSAGE, null, 0, 0, 0, 0.0, false);
+                return new GoalSection(null, NO_GOAL_MESSAGE, null, 0, 0, 0, 0.0, false, null);
             }
 
             String aptName = dreamHome.getApartment() != null
@@ -163,6 +173,9 @@ public record DashboardResponse(
             long targetAmount = dreamHome.getTargetAmount() != null ? dreamHome.getTargetAmount() : 0;
             long savedAmount = dreamHome.getCurrentSavedAmount() != null ? dreamHome.getCurrentSavedAmount() : 0;
 
+            // V2: 연결된 매물 정보 추출
+            LinkedProperty linkedProperty = buildLinkedProperty(dreamHome);
+
             return new GoalSection(
                     dreamHome.getDreamHomeId(),
                     displayName,
@@ -171,10 +184,53 @@ public record DashboardResponse(
                     savedAmount,
                     dreamHome.getRemainingAmount(),
                     dreamHome.getAchievementRate(),
-                    dreamHome.isCompleted()
+                    dreamHome.isCompleted(),
+                    linkedProperty
             );
         }
+
+        /**
+         * 연결된 매물 정보 추출
+         * <p>
+         * V2: 매물이 연결되어 있으면 Gap 정보 포함, 없으면 null
+         */
+        private static LinkedProperty buildLinkedProperty(DreamHome dreamHome) {
+            Apartment apt = dreamHome.getApartment();
+            if (apt == null) {
+                return null;
+            }
+
+            // 최신 거래가 추출 (단위: 원)
+            Long price = null;
+            if (apt.getDeals() != null && !apt.getDeals().isEmpty()) {
+                Long dealAmountNum = apt.getDeals().get(0).getDealAmountNum();
+                price = dealAmountNum != null ? dealAmountNum * 10_000 : null;
+            }
+
+            long savedAmount = dreamHome.getCurrentSavedAmount() != null
+                    ? dreamHome.getCurrentSavedAmount() : 0L;
+
+            // Gap = 시세 - 저축액 (항상 0 이상)
+            long gap = price != null ? Math.max(0, price - savedAmount) : 0L;
+
+            return new LinkedProperty(apt.getAptSeq(), apt.getAptNm(), price, gap);
+        }
     }
+
+    /**
+     * 연결된 매물 정보 (V2)
+     * <p>
+     * 저축 목표와 분리된 참조용 매물 정보.
+     * Gap 정보를 통해 실제 집값과의 차이를 표시.
+     */
+    @Schema(description = "연결된 매물 정보 (참조용)")
+    public record LinkedProperty(
+            @Schema(description = "아파트 코드") String aptSeq,
+            @Schema(description = "아파트명") String name,
+            @Schema(description = "실제 시세 (원, nullable)") Long price,
+            @Schema(description = "Gap (시세 - 현재 저축액, 항상 0 이상)") long gap
+    ) {}
+
 
     // ==========================================================================
     // Nested Records: Streak Section
@@ -520,11 +576,12 @@ public record DashboardResponse(
      * Gap 분석 섹션
      * <p>
      * 목표 금액에서 현재 자산, 저축, 대출 한도를 차감한 필요 저축액 계산.
+     * 매물이 연결되어 있으면 목표 금액은 실거래가(최신) 기준.
      */
     @Schema(description = "Gap 분석 섹션")
     public record GapAnalysisSection(
             @Schema(description = "목표 설정 여부") boolean hasTarget,
-            @Schema(description = "목표 금액 (미설정 시 지역 평균)") long targetAmount,
+            @Schema(description = "목표 금액 (연결 매물 시 시세, 미설정 시 지역 평균)") long targetAmount,
             @Schema(description = "현재 자산 (온보딩)") long currentAssets,
             @Schema(description = "현재 저축") long currentSavedAmount,
             @Schema(description = "추정 대출 한도") long virtualLoanLimit,
@@ -534,8 +591,7 @@ public record DashboardResponse(
         /**
          * 목표 설정 시 Gap 분석
          */
-        public static GapAnalysisSection from(DreamHome dreamHome, User user, long maxLoanAmount) {
-            long targetAmount = dreamHome.getTargetAmount() != null ? dreamHome.getTargetAmount() : 0L;
+        public static GapAnalysisSection from(DreamHome dreamHome, User user, long maxLoanAmount, long targetAmount) {
             long currentAssets = user.getCurrentAssets() != null ? user.getCurrentAssets() : 0L;
             long currentSaved = dreamHome.getCurrentSavedAmount() != null ? dreamHome.getCurrentSavedAmount() : 0L;
             long requiredSavings = Math.max(0, targetAmount - currentAssets - currentSaved - maxLoanAmount);
