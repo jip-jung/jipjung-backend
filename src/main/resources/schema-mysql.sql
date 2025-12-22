@@ -112,6 +112,7 @@ CREATE TABLE apartment_deal (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (apt_seq) REFERENCES apartment(apt_seq) ON DELETE CASCADE,
+    UNIQUE KEY uk_deal_unique (apt_seq, deal_year, deal_month, deal_day, floor, exclu_use_ar),
     INDEX idx_deal_date (deal_date),
     INDEX idx_deal_amount (deal_amount_num),
     INDEX idx_exclu_use_ar (exclu_use_ar)
@@ -210,6 +211,14 @@ ALTER TABLE `user` ADD COLUMN max_streak INT DEFAULT 0;
 ALTER TABLE `user` ADD COLUMN selected_theme_id INT;
 ALTER TABLE `user` ADD COLUMN is_deleted BOOLEAN DEFAULT FALSE;
 
+-- ì¸í…Œë¦¬ì–´(ê°€êµ¬) ì§„í–‰ ìƒíƒœ ì»¬ëŸ¼ (Phase 2: ì§‘ ì™„ê³µ í›„ ê°€êµ¬ ë°°ì¹˜)
+ALTER TABLE `user` ADD COLUMN build_track VARCHAR(20) NOT NULL DEFAULT 'house' 
+    COMMENT 'í˜„ì¬ íŠ¸ë™ (house: ì§‘ ì§“ê¸°, furniture: ì¸í…Œë¦¬ì–´)';
+ALTER TABLE `user` ADD COLUMN furniture_stage INT NOT NULL DEFAULT 0 
+    COMMENT 'ì¸í…Œë¦¬ì–´ ë‹¨ê³„ (0: ë¯¸ì‹œì‘, 1-5: ì§„í–‰ ì¤‘)';
+ALTER TABLE `user` ADD COLUMN furniture_exp INT NOT NULL DEFAULT 0 
+    COMMENT 'í˜„ì¬ ì¸í…Œë¦¬ì–´ ë‹¨ê³„ ë‚´ ê²½í—˜ì¹˜';
+
 -- ----------------------------------------------------------------------------
 -- 3.10 dream_home - ë“œë¦¼í™ˆ(ëª©í‘œ) í…Œì´ë¸”
 -- ----------------------------------------------------------------------------
@@ -217,6 +226,7 @@ CREATE TABLE dream_home (
     dream_home_id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
     apt_seq VARCHAR(20) NOT NULL,
+    house_name VARCHAR(100) COMMENT 'ìœ ì €ê°€ ë¶™ì¸ ì§‘ ì´ë¦„',
     target_amount BIGINT NOT NULL COMMENT 'ëª©í‘œ ê¸ˆì•¡',
     target_date DATE NOT NULL COMMENT 'ëª©í‘œ ë‹¬ì„±ì¼',
     monthly_goal BIGINT COMMENT 'ì›” ëª©í‘œ ì €ì¶•ì•¡',
@@ -426,3 +436,22 @@ COMMENT='ì¼ì¼ í™œë™ ê¸°ë¡ í…Œì´ë¸”';
 -- End of Schema DDL
 -- ============================================================================
 
+
+-- ============================================================================
+-- 8. MOLIT API Sync History (Phase: API Integration)
+-- ============================================================================
+
+-- MOLIT API È£Ãâ ÀÌ·Â Å×ÀÌºí (Áßº¹ È£Ãâ ¹æÁö)
+DROP TABLE IF EXISTS molit_sync_history;
+
+CREATE TABLE molit_sync_history (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    lawd_cd VARCHAR(5) NOT NULL COMMENT '¹ıÁ¤µ¿ÄÚµå ¾Õ 5ÀÚ¸®',
+    deal_ymd VARCHAR(6) NOT NULL COMMENT '°Å·¡³â¿ù (YYYYMM)',
+    synced_count INT DEFAULT 0 COMMENT 'µ¿±âÈ­µÈ °Ç¼ö',
+    synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'µ¿±âÈ­ ½Ã°£',
+    
+    UNIQUE KEY uk_lawd_ymd (lawd_cd, deal_ymd),
+    INDEX idx_synced_at (synced_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+COMMENT='MOLIT API µ¿±âÈ­ ÀÌ·Â Å×ÀÌºí';

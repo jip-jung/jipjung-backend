@@ -231,12 +231,26 @@ public class DashboardService {
     private GapAnalysisSection buildGapAnalysis(Long userId, User user, DreamHome dreamHome, long maxLoanAmount, List<String> preferredAreas) {
         if (dreamHome != null) {
             // 목표 설정됨
-            return GapAnalysisSection.from(dreamHome, user, maxLoanAmount);
+            long gapTargetAmount = resolveGapTargetAmount(dreamHome);
+            return GapAnalysisSection.from(dreamHome, user, maxLoanAmount, gapTargetAmount);
         } else {
             // 목표 미설정 → 선호 지역 평균 시세로 임시 목표
             long regionAvgPrice = getRegionAveragePrice(userId, preferredAreas);
             return GapAnalysisSection.forNoTarget(user, maxLoanAmount, regionAvgPrice);
         }
+    }
+
+    private long resolveGapTargetAmount(DreamHome dreamHome) {
+        long fallbackTarget = dreamHome.getTargetAmount() != null ? dreamHome.getTargetAmount() : 0L;
+        String aptSeq = dreamHome.getAptSeq();
+        if (aptSeq == null) {
+            return fallbackTarget;
+        }
+        Long latestDealAmountNum = apartmentDealMapper.findLatestDealAmountNumByAptSeq(aptSeq);
+        if (latestDealAmountNum == null) {
+            return fallbackTarget;
+        }
+        return latestDealAmountNum * 10_000;
     }
 
     /**

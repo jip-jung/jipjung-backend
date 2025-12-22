@@ -204,6 +204,11 @@ ALTER TABLE `user` ADD COLUMN max_streak INT DEFAULT 0;
 ALTER TABLE `user` ADD COLUMN selected_theme_id INT;
 ALTER TABLE `user` ADD COLUMN is_deleted BOOLEAN DEFAULT FALSE;
 
+-- 인테리어(가구) 진행 상태 컬럼 (Phase 2: 집 완공 후 가구 배치)
+ALTER TABLE `user` ADD COLUMN build_track VARCHAR(20) DEFAULT 'house';
+ALTER TABLE `user` ADD COLUMN furniture_stage INT DEFAULT 0;
+ALTER TABLE `user` ADD COLUMN furniture_exp INT DEFAULT 0;
+
 -- ----------------------------------------------------------------------------
 -- 3.10 dream_home - 드림홈(목표) 테이블
 -- ----------------------------------------------------------------------------
@@ -211,6 +216,7 @@ CREATE TABLE dream_home (
     dream_home_id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
     apt_seq VARCHAR(20) NOT NULL,
+    house_name VARCHAR(100) COMMENT '유저가 붙인 집 이름',
     target_amount BIGINT NOT NULL COMMENT '목표 금액',
     target_date DATE NOT NULL COMMENT '목표 달성일',
     monthly_goal BIGINT COMMENT '월 목표 저축액',

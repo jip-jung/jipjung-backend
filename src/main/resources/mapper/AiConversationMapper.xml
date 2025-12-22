@@ -72,4 +72,19 @@
         WHERE conversation_id = #{conversationId}
     </update>
 
+    <!-- 판결 완료 대화 이벤트 조회 (기간 필터) -->
+    <select id="findJudgedEventsByUserIdAndDateRange" resultType="map">
+        SELECT
+            conversation_id,
+            judgment_result,
+            judgment_score,
+            exp_change,
+            updated_at
+        FROM ai_conversation
+        WHERE user_id = #{userId}
+          AND status = 'JUDGED'
+          AND updated_at BETWEEN #{startAt} AND #{endAt}
+        ORDER BY updated_at ASC
+    </select>
+
 </mapper>

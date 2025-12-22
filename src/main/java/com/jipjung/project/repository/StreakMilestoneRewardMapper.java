@@ -43,4 +43,18 @@ public interface StreakMilestoneRewardMapper {
      * @return 수령한 마일스톤 목록
      */
     List<StreakMilestoneReward> findByUserId(@Param("userId") Long userId);
+
+    /**
+     * 기간 내 마일스톤 보상 이벤트 조회
+     *
+     * @param userId 사용자 ID
+     * @param startAt 시작 시각
+     * @param endAt 종료 시각
+     * @return 마일스톤 보상 이벤트 목록
+     */
+    java.util.List<java.util.Map<String, Object>> findRewardsByUserIdAndDateRange(
+            @Param("userId") Long userId,
+            @Param("startAt") java.time.LocalDateTime startAt,
+            @Param("endAt") java.time.LocalDateTime endAt
+    );
 }

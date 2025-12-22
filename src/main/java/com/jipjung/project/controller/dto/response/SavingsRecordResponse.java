@@ -36,7 +36,20 @@ public record SavingsRecordResponse(
             Long targetAmount,
 
             @Schema(description = "달성률 (%)", example = "17.0")
-            double achievementRate
+            double achievementRate,
+
+            @Schema(description = "목표 달성 여부", example = "false")
+            boolean isCompleted,
+
+            @Schema(description = "이번 저축으로 목표 달성 여부", example = "false")
+            boolean justCompleted,
+
+            @Schema(description = "완성된 컬렉션 ID (완료 시)", example = "12", nullable = true)
+            @Nullable
+            Long completedCollectionId,
+
+            @Schema(description = "다음 목표 설정 가능 여부", example = "false")
+            boolean nextGoalAvailable
     ) {
     }
 
@@ -82,7 +95,8 @@ public record SavingsRecordResponse(
             GrowthLevel currentLevel,
             boolean isLevelUp
     ) {
-        return from(dreamHome, expChange, user, currentLevel, isLevelUp, null);
+        return from(dreamHome, expChange, user, currentLevel, isLevelUp, null,
+                dreamHome.isCompleted(), false, null);
     }
 
     /**
@@ -101,13 +115,20 @@ public record SavingsRecordResponse(
             User user,
             GrowthLevel currentLevel,
             boolean isLevelUp,
-            StreakInfo streakInfo
+            StreakInfo streakInfo,
+            boolean isCompleted,
+            boolean justCompleted,
+            Long completedCollectionId
     ) {
         // 드림홈 상태
         DreamHomeStatus status = new DreamHomeStatus(
                 dreamHome.getCurrentSavedAmount(),
                 dreamHome.getTargetAmount(),
-                dreamHome.getAchievementRate()
+                dreamHome.getAchievementRate(),
+                isCompleted,
+                justCompleted,
+                completedCollectionId,
+                isCompleted
         );
 
         // 성장 결과

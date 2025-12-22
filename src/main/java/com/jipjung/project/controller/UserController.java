@@ -1,9 +1,11 @@
 package com.jipjung.project.controller;
 
 import com.jipjung.project.controller.dto.request.DeleteAccountRequest;
+import com.jipjung.project.controller.dto.request.FurnitureProgressRequest;
 import com.jipjung.project.controller.dto.request.OnboardingRequest;
 import com.jipjung.project.controller.dto.request.ProfileUpdateRequest;
 import com.jipjung.project.controller.dto.response.DeleteAccountResponse;
+import com.jipjung.project.controller.dto.response.FurnitureProgressResponse;
 import com.jipjung.project.controller.dto.response.OnboardingResponse;
 import com.jipjung.project.controller.dto.response.ProfileUpdateResponse;
 import com.jipjung.project.global.response.ApiResponse;
@@ -21,6 +23,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -160,5 +163,37 @@ public class UserController {
     ) {
         userService.deleteAccount(userDetails.getUsername(), request.password());
         return ApiResponse.success(new DeleteAccountResponse("회원탈퇴가 완료되었습니다"));
+    }
+
+    /**
+     * 인테리어 진행 상태 동기화
+     * <p>
+     * 클라이언트에서 계산된 인테리어 진행 상태를 서버에 저장합니다.
+     * 서버는 값을 검증하고 클램핑하여 저장된 실제 값을 반환합니다.
+     */
+    @Operation(
+            summary = "인테리어 진행 상태 동기화",
+            description = """
+                    클라이언트에서 계산된 인테리어(가구) 진행 상태를 서버에 저장합니다.
+                    
+                    **저장 정보:**
+                    - buildTrack: 현재 트랙 (house/furniture)
+                    - furnitureStage: 인테리어 단계 (0-5)
+                    - furnitureExp: 현재 단계 내 경험치
+                    
+                    서버는 값을 검증하고 필요 시 클램핑하여 저장된 실제 값을 반환합니다.
+                    """,
+            security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @PutMapping("/furniture-progress")
+    public ResponseEntity<ApiResponse<FurnitureProgressResponse>> updateFurnitureProgress(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @Valid @RequestBody FurnitureProgressRequest request
+    ) {
+        FurnitureProgressResponse response = userService.updateFurnitureProgress(
+                userDetails.getId(),
+                request
+        );
+        return ApiResponse.success(response);
     }
 }

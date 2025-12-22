@@ -70,6 +70,20 @@ public record CollectionResponse(
             );
         }
 
+        public static InProgressInfo fromMap(Map<String, Object> map, int currentPhase) {
+            if (map == null) return null;
+            int safePhase = Math.max(1, Math.min(TOTAL_PHASES, currentPhase));
+
+            return new InProgressInfo(
+                    getLong(map, "dream_home_id"),
+                    getString(map, "theme_code"),
+                    getString(map, "property_name"),
+                    getString(map, "location"),
+                    safePhase,
+                    TOTAL_PHASES
+            );
+        }
+
         private static int calculatePhase(Long savedAmount, Long targetAmount) {
             if (targetAmount == null || targetAmount <= 0) return 1;
             long saved = savedAmount != null ? savedAmount : 0;

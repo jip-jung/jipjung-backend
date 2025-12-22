@@ -30,6 +30,7 @@ public class DreamHome {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private Boolean isDeleted;
+    private String houseName;  // 사용자 정의 집 이름 (nullable, 없으면 aptNm 사용)
 
     // 조인된 아파트 정보 (optional)
     private Apartment apartment;

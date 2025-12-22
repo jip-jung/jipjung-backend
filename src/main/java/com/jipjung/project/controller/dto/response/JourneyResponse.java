@@ -62,7 +62,16 @@ public record JourneyResponse(
             int totalDeposits,
 
             @Schema(description = "목표 금액 (원)", example = "50000000")
-            Long targetAmount
+            Long targetAmount,
+
+            @Schema(description = "목표 XP", example = "5000")
+            Integer targetExp,
+
+            @Schema(description = "현재 누적 XP", example = "820")
+            Integer totalExp,
+
+            @Schema(description = "현재 Phase (1-11)", example = "4")
+            Integer currentPhase
     ) {}
 
     /**
@@ -85,8 +94,11 @@ public record JourneyResponse(
             @Schema(description = "Phase 도달 시각")
             LocalDateTime reachedAt,
 
-            @Schema(description = "누적 저축 금액 (원)", example = "5000000")
+            @Schema(description = "누적 저축 금액 (원, optional)", example = "5000000")
             Long cumulativeAmount,
+
+            @Schema(description = "누적 XP", example = "120")
+            Integer cumulativeExp,
 
             @Schema(description = "이 Phase의 이벤트 목록")
             List<JourneyEvent> events
@@ -106,14 +118,20 @@ public record JourneyResponse(
             @Schema(description = "이벤트 날짜")
             LocalDateTime date,
 
-            @Schema(description = "금액 (원)", example = "500000")
+            @Schema(description = "금액 (원, optional)", example = "500000")
             Long amount,
 
             @Schema(description = "메모", example = "월급날 저축!")
             String memo,
 
-            @Schema(description = "누적 저축 합계 (원)", example = "5000000")
-            Long cumulativeTotal
+            @Schema(description = "누적 저축 합계 (원, optional)", example = "5000000")
+            Long cumulativeTotal,
+
+            @Schema(description = "경험치 변화량", example = "20")
+            Integer expChange,
+
+            @Schema(description = "누적 경험치", example = "120")
+            Integer cumulativeExp
     ) {
         /**
          * Map으로부터 JourneyEvent 생성
@@ -125,7 +143,9 @@ public record JourneyResponse(
                     getLocalDateTime(map, "date"),
                     getLong(map, "amount"),
                     getString(map, "memo"),
-                    getLong(map, "cumulative_total")
+                    getLong(map, "cumulative_total"),
+                    getInt(map, "exp_change"),
+                    getInt(map, "cumulative_exp")
             );
         }
 
@@ -146,6 +166,14 @@ public record JourneyResponse(
             Object val = map.get(key);
             if (val instanceof LocalDateTime ldt) return ldt;
             if (val instanceof java.sql.Timestamp ts) return ts.toLocalDateTime();
+            return null;
+        }
+
+        private static Integer getInt(Map<String, Object> map, String key) {
+            Object val = map.get(key);
+            if (val == null) return null;
+            if (val instanceof Integer i) return i;
+            if (val instanceof Number n) return n.intValue();
             return null;
         }
     }

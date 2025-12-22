@@ -46,4 +46,17 @@
         VALUES (#{userId}, #{activityDate}, #{activityType}, #{expEarned})
     </insert>
 
+    <!-- 기간 내 활동 이벤트 조회 (created_at 기준) -->
+    <select id="findExpEventsByUserIdAndDateRange" resultType="map">
+        SELECT
+            activity_id,
+            activity_type,
+            exp_earned,
+            created_at
+        FROM daily_activity
+        WHERE user_id = #{userId}
+          AND created_at BETWEEN #{startAt} AND #{endAt}
+        ORDER BY created_at ASC
+    </select>
+
 </mapper>

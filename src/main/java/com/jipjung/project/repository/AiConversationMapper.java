@@ -65,4 +65,13 @@ public interface AiConversationMapper {
         @Param("userId") Long userId,
         @Param("limit") int limit
     );
+
+    /**
+     * 판결 완료 대화 이벤트 조회 (기간 필터)
+     */
+    List<java.util.Map<String, Object>> findJudgedEventsByUserIdAndDateRange(
+        @Param("userId") Long userId,
+        @Param("startAt") java.time.LocalDateTime startAt,
+        @Param("endAt") java.time.LocalDateTime endAt
+    );
 }

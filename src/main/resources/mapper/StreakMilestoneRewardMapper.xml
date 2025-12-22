@@ -37,4 +37,17 @@
         ORDER BY milestone_days ASC
     </select>
 
+    <!-- 기간 내 마일스톤 보상 이벤트 조회 -->
+    <select id="findRewardsByUserIdAndDateRange" resultType="map">
+        SELECT
+            reward_id,
+            milestone_days,
+            exp_reward,
+            claimed_at
+        FROM streak_milestone_reward
+        WHERE user_id = #{userId}
+          AND claimed_at BETWEEN #{startAt} AND #{endAt}
+        ORDER BY claimed_at ASC
+    </select>
+
 </mapper>
