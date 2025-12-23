@@ -10,6 +10,7 @@ import com.jipjung.project.controller.dto.response.JourneyResponse.PhaseInfo;
 import com.jipjung.project.domain.ActivityType;
 import com.jipjung.project.domain.Apartment;
 import com.jipjung.project.domain.DreamHome;
+import com.jipjung.project.domain.DreamHomeStatus;
 import com.jipjung.project.domain.User;
 import com.jipjung.project.domain.UserCollection;
 import com.jipjung.project.global.exception.BusinessException;
@@ -285,6 +286,85 @@ public class CollectionService {
         collectionMapper.setMainDisplay(collectionId);
 
         log.info("Main display set. userId: {}, collectionId: {}", userId, collectionId);
+    }
+
+    // =========================================================================
+    // 목표 XP 달성 체크
+    // =========================================================================
+
+    /**
+     * 목표 XP 달성 여부 확인 및 완료 처리
+     * <p>
+     * 총 XP가 목표 XP에 도달하면 드림홈을 COMPLETED로 전환하고
+     * 컬렉션을 자동 등록합니다.
+     */
+    @Transactional
+    public GoalCompletionResult checkAndUpdateCompletionByExp(Long userId) {
+        DreamHome dreamHome = dreamHomeMapper.findActiveByUserId(userId);
+        if (dreamHome == null) {
+            return new GoalCompletionResult(false, false, null);
+        }
+        return checkAndUpdateCompletionByExp(userId, dreamHome, nullToZero(dreamHome.getCurrentSavedAmount()));
+    }
+
+    /**
+     * 목표 XP 달성 여부 확인 및 완료 처리 (드림홈 지정)
+     */
+    @Transactional
+    public GoalCompletionResult checkAndUpdateCompletionByExp(Long userId, DreamHome dreamHome, long currentSavedAmount) {
+        if (dreamHome == null || dreamHome.getDreamHomeId() == null) {
+            return new GoalCompletionResult(false, false, null);
+        }
+
+        boolean wasCompleted = dreamHome.getStatus() == DreamHomeStatus.COMPLETED;
+        int targetExp = ExpPolicy.calculateTargetExp(dreamHome.getTargetAmount());
+        if (targetExp <= 0) {
+            return new GoalCompletionResult(wasCompleted, false, null);
+        }
+
+        int safeTargetExp = Math.max(1, targetExp);
+        LocalDateTime startAt = resolveJourneyStart(dreamHome);
+        JourneyEventData eventData = loadJourneyEvents(userId, dreamHome.getDreamHomeId(), startAt, LocalDateTime.now());
+        JourneyProgressSnapshot snapshot = calculateProgressSnapshot(eventData.events(), safeTargetExp);
+        int totalExp = snapshot.totalExp();
+
+        boolean isCompleted = wasCompleted || totalExp >= targetExp;
+        boolean justCompleted = !wasCompleted && totalExp >= targetExp;
+        Long completedCollectionId = null;
+
+        if (justCompleted) {
+            dreamHomeMapper.updateStatus(dreamHome.getDreamHomeId(), DreamHomeStatus.COMPLETED);
+            completedCollectionId = registerOnCompletion(userId, dreamHome, currentSavedAmount);
+        }
+
+        return new GoalCompletionResult(isCompleted, justCompleted, completedCollectionId);
+    }
+
+    /**
+     * 목표 XP 진행 현황 조회 (대시보드/요약용)
+     */
+    @Transactional(readOnly = true)
+    public GoalProgress getGoalProgress(Long userId, DreamHome dreamHome) {
+        if (dreamHome == null || dreamHome.getDreamHomeId() == null) {
+            return GoalProgress.empty();
+        }
+
+        int targetExp = ExpPolicy.calculateTargetExp(dreamHome.getTargetAmount());
+        if (targetExp <= 0) {
+            return GoalProgress.empty();
+        }
+
+        int safeTargetExp = Math.max(1, targetExp);
+        LocalDateTime startAt = resolveJourneyStart(dreamHome);
+        JourneyEventData eventData = loadJourneyEvents(userId, dreamHome.getDreamHomeId(), startAt, LocalDateTime.now());
+        JourneyProgressSnapshot snapshot = calculateProgressSnapshot(eventData.events(), safeTargetExp);
+
+        int totalExp = snapshot.totalExp();
+        int currentPhase = snapshot.currentPhase();
+        double percent = Math.min(100.0, Math.max(0.0, (totalExp * 100.0) / targetExp));
+        double roundedPercent = Math.round(percent * 10.0) / 10.0;
+
+        return new GoalProgress(targetExp, totalExp, currentPhase, roundedPercent);
     }
 
     // =========================================================================
@@ -912,6 +992,23 @@ public class CollectionService {
     private record JourneyPhaseResult(List<PhaseInfo> phases, int totalExp, int currentPhase) {}
 
     private record JourneyProgressSnapshot(int totalExp, int currentPhase) {}
+
+    public record GoalCompletionResult(
+            boolean isCompleted,
+            boolean justCompleted,
+            Long completedCollectionId
+    ) {}
+
+    public record GoalProgress(
+            int targetExp,
+            int totalExp,
+            int currentPhase,
+            double expProgress
+    ) {
+        public static GoalProgress empty() {
+            return new GoalProgress(0, 0, 1, 0.0);
+        }
+    }
 
     private record JourneyCollectionDetail(
             Long targetAmount,
