@@ -161,6 +161,13 @@ public class DashboardService {
         // 5. DreamHome 조회 (ACTIVE 우선, 없으면 최근 COMPLETED; 없으면 null)
         DreamHome dreamHome = dreamHomeMapper.findLatestForDashboardByUserId(userId);
 
+        // 5-1. XP 기준 완료 상태 보정 (대시보드 진입 시에도 동기화)
+        CollectionService.GoalCompletionResult completionResult =
+                collectionService.checkAndUpdateCompletionByExp(userId);
+        if (completionResult.justCompleted()) {
+            dreamHome = dreamHomeMapper.findLatestForDashboardByUserId(userId);
+        }
+
         // 6. HouseTheme 조회 (fallback + 로깅)
         HouseTheme houseTheme = resolveHouseTheme(user.getSelectedThemeId());
 

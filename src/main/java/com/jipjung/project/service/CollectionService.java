@@ -97,8 +97,10 @@ public class CollectionService {
      * @param userId 사용자 ID
      * @return 컬렉션 목록 응답
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public CollectionResponse getCollections(Long userId) {
+        checkAndUpdateCompletionByExp(userId);
+
         List<Map<String, Object>> rawCollections = collectionMapper.findByUserId(userId);
         Map<String, Object> inProgressData = collectionMapper.findInProgressSummary(userId);
         boolean hasActiveGoal = inProgressData != null || collectionMapper.hasActiveDreamHome(userId);
@@ -127,8 +129,10 @@ public class CollectionService {
      * @return 저축 여정 응답 (완성된 여정과 동일한 형식)
      * @throws BusinessException 진행 중인 드림홈이 없는 경우
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public JourneyResponse getInProgressJourney(Long userId) {
+        checkAndUpdateCompletionByExp(userId);
+
         Map<String, Object> inProgressData = collectionMapper.findInProgressSummary(userId);
         if (inProgressData == null) {
             throw new BusinessException(ErrorCode.DREAM_HOME_NOT_FOUND,
@@ -365,6 +369,18 @@ public class CollectionService {
         double roundedPercent = Math.round(percent * 10.0) / 10.0;
 
         return new GoalProgress(targetExp, totalExp, currentPhase, roundedPercent);
+    }
+
+    /**
+     * 목표 XP 진행 현황 조회 (활성 드림홈 기준)
+     */
+    @Transactional(readOnly = true)
+    public GoalProgress getGoalProgress(Long userId) {
+        DreamHome dreamHome = dreamHomeMapper.findActiveByUserId(userId);
+        if (dreamHome == null) {
+            return GoalProgress.empty();
+        }
+        return getGoalProgress(userId, dreamHome);
     }
 
     // =========================================================================

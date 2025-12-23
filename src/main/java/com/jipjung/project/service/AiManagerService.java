@@ -8,6 +8,7 @@ import com.jipjung.project.controller.dto.request.ConfirmExtractedDataRequest;
 import com.jipjung.project.controller.dto.request.JudgmentRequest;
 import com.jipjung.project.controller.dto.request.SpendingAnalyzeRequest;
 import com.jipjung.project.controller.dto.response.AiHistoryResponse;
+import com.jipjung.project.controller.dto.response.GoalExpProgressResponse;
 import com.jipjung.project.controller.dto.response.JudgmentResponse;
 import com.jipjung.project.controller.dto.response.SpendingAnalyzeResponse;
 import com.jipjung.project.domain.ActivityType;
@@ -209,9 +210,17 @@ public class AiManagerService {
         }
 
         collectionService.checkAndUpdateCompletionByExp(userId);
+        CollectionService.GoalProgress goalProgress = collectionService.getGoalProgress(userId);
 
         // 응답에 실제 적용된 값 사용 (UI와 일치하도록)
-        return JudgmentResponse.from(aiOutput, updatedUser, levelInfo, safeExpChange, isLevelUp);
+        return JudgmentResponse.from(
+                aiOutput,
+                updatedUser,
+                levelInfo,
+                safeExpChange,
+                isLevelUp,
+                GoalExpProgressResponse.from(goalProgress)
+        );
     }
 
     /**
