@@ -3,6 +3,7 @@ package com.jipjung.project.service;
 import com.jipjung.project.controller.dto.request.DreamHomeSetRequest;
 import com.jipjung.project.controller.dto.request.SavingsRecordRequest;
 import com.jipjung.project.controller.dto.response.DreamHomeSetResponse;
+import com.jipjung.project.controller.dto.response.GoalExpProgressResponse;
 import com.jipjung.project.controller.dto.response.SavingsRecordResponse;
 import com.jipjung.project.controller.dto.response.StreakInfo;
 import com.jipjung.project.domain.*;
@@ -94,9 +95,7 @@ public class DreamHomeService {
         DreamHome dreamHome = findActiveDreamHomeOrThrow(userId);
 
         saveSavingsHistory(dreamHome.getDreamHomeId(), request);
-        long previousSavedAmount = nullToZero(dreamHome.getCurrentSavedAmount());
         long newSavedAmount = updateSavedAmount(dreamHome, request);
-        CompletionResult completionResult = checkAndUpdateCompletion(dreamHome, previousSavedAmount, newSavedAmount, userId);
 
         ExpLevelResult expResult = processExpAndLevel(userId, request);
 
@@ -105,6 +104,9 @@ public class DreamHomeService {
         if (request.saveType() == SaveType.DEPOSIT) {
             streakResult = streakService.participate(userId, ActivityType.SAVINGS);
         }
+
+        CollectionService.GoalCompletionResult completionResult =
+                collectionService.checkAndUpdateCompletionByExp(userId, dreamHome, newSavedAmount);
 
         return buildSavingsResponse(dreamHome, newSavedAmount, completionResult, expResult, streakResult);
     }
@@ -295,30 +297,6 @@ public class DreamHomeService {
         return saveType == SaveType.DEPOSIT ? amount : -amount;
     }
 
-    private CompletionResult checkAndUpdateCompletion(
-            DreamHome dreamHome,
-            long previousSavedAmount,
-            long newSavedAmount,
-            Long userId
-    ) {
-        long targetAmount = nullToZero(dreamHome.getTargetAmount());
-        boolean isCompleted = newSavedAmount >= targetAmount;
-        boolean wasCompleted = previousSavedAmount >= targetAmount;
-        boolean justCompleted = !wasCompleted && isCompleted;
-        Long completedCollectionId = null;
-
-        if (isCompleted) {
-            dreamHomeMapper.updateStatus(dreamHome.getDreamHomeId(), DreamHomeStatus.COMPLETED);
-            log.info("Dream home completed! userId: {}, dreamHomeId: {}", userId, dreamHome.getDreamHomeId());
-
-            // 컬렉션 자동 등록 (멱등성 보장)
-            if (justCompleted) {
-                completedCollectionId = collectionService.registerOnCompletion(userId, dreamHome, newSavedAmount);
-            }
-        }
-        return new CompletionResult(isCompleted, justCompleted, completedCollectionId);
-    }
-
     // =========================================================================
     // Experience & Level Operations
     // =========================================================================
@@ -371,10 +349,12 @@ public class DreamHomeService {
     private SavingsRecordResponse buildSavingsResponse(
             DreamHome dreamHome,
             long newSavedAmount,
-            CompletionResult completionResult,
+            CollectionService.GoalCompletionResult completionResult,
             ExpLevelResult expResult,
             StreakService.StreakResult streakResult
     ) {
+        CollectionService.GoalProgress goalProgress = collectionService.getGoalProgress(dreamHome.getUserId(), dreamHome);
+        GoalExpProgressResponse goalExpProgress = GoalExpProgressResponse.from(goalProgress);
         DreamHome updatedDreamHome = DreamHome.builder()
                 .dreamHomeId(dreamHome.getDreamHomeId())
                 .currentSavedAmount(newSavedAmount)
@@ -401,7 +381,8 @@ public class DreamHomeService {
                 streakInfo,
                 completionResult.isCompleted(),
                 completionResult.justCompleted(),
-                completionResult.completedCollectionId()
+                completionResult.completedCollectionId(),
+                goalExpProgress
         );
     }
 
@@ -430,6 +411,4 @@ public class DreamHomeService {
     // =========================================================================
 
     private record ExpLevelResult(int expChange, User user, GrowthLevel growthLevel, boolean isLevelUp) {}
-
-    private record CompletionResult(boolean isCompleted, boolean justCompleted, Long completedCollectionId) {}
 }

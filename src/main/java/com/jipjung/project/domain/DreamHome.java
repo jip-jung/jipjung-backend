@@ -39,6 +39,9 @@ public class DreamHome {
      * 목표 달성 여부
      */
     public boolean isCompleted() {
+        if (status != null) {
+            return status == DreamHomeStatus.COMPLETED;
+        }
         return getSafeCurrentSavedAmount() >= getSafeTargetAmount();
     }
 

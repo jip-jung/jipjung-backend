@@ -7,7 +7,7 @@ final class ExpPolicy {
 
     static final long SAVINGS_EXP_UNIT_AMOUNT = 10_000L;
     static final int SAVINGS_EXP_PER_UNIT = 1;
-    static final int MAX_EXP_PER_SAVINGS = 500;
+    static final int MAX_EXP_PER_SAVINGS = 1000;
 
     private ExpPolicy() {}
 
@@ -22,6 +22,7 @@ final class ExpPolicy {
         }
         return (int) Math.min(exp, MAX_EXP_PER_SAVINGS);
     }
+
 
     static int calculateTargetExp(Long targetAmount) {
         if (targetAmount == null || targetAmount <= 0) {

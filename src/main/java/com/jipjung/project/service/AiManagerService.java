@@ -8,6 +8,7 @@ import com.jipjung.project.controller.dto.request.ConfirmExtractedDataRequest;
 import com.jipjung.project.controller.dto.request.JudgmentRequest;
 import com.jipjung.project.controller.dto.request.SpendingAnalyzeRequest;
 import com.jipjung.project.controller.dto.response.AiHistoryResponse;
+import com.jipjung.project.controller.dto.response.GoalExpProgressResponse;
 import com.jipjung.project.controller.dto.response.JudgmentResponse;
 import com.jipjung.project.controller.dto.response.SpendingAnalyzeResponse;
 import com.jipjung.project.domain.ActivityType;
@@ -65,6 +66,7 @@ public class AiManagerService {
     private final AiConversationMapper aiConversationMapper;
     private final GrowthLevelMapper growthLevelMapper;
     private final StreakService streakService;
+    private final CollectionService collectionService;
 
     // 경험치 상수 (프론트엔드 constants/exp.js와 동기화 필요)
     private static final int EXP_REASONABLE = 20;  // 합리적 소비: +20 EXP (20만원 상당)
@@ -207,8 +209,18 @@ public class AiManagerService {
             log.warn("AI judgment streak participation failed for userId: {}", userId, e);
         }
 
+        collectionService.checkAndUpdateCompletionByExp(userId);
+        CollectionService.GoalProgress goalProgress = collectionService.getGoalProgress(userId);
+
         // 응답에 실제 적용된 값 사용 (UI와 일치하도록)
-        return JudgmentResponse.from(aiOutput, updatedUser, levelInfo, safeExpChange, isLevelUp);
+        return JudgmentResponse.from(
+                aiOutput,
+                updatedUser,
+                levelInfo,
+                safeExpChange,
+                isLevelUp,
+                GoalExpProgressResponse.from(goalProgress)
+        );
     }
 
     /**
